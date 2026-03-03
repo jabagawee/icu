@@ -1184,50 +1184,59 @@ public final class ICUResourceBundleReader {
         private static final int ROOT_BITS = 7;
         private static final int NEXT_BITS = 6;
 
-        // Simple table, used when length >= 0.
-        private int[] keys = new int[SIMPLE_LENGTH];
-        private Object[] values = new Object[SIMPLE_LENGTH];
-        private int length;
+        /**
+         * Immutable snapshot of the cache state.
+         * Implements the "Volatile Holder" pattern (Java Concurrency in Practice, 3.4.1).
+         */
+        private static final class CacheSnapshot {
+            final int[] keys;
+            final Object[] values;
+            final int length;
+            final Level rootLevel;
 
-        // Trie-like tree of levels, used when length < 0.
-        private int maxOffsetBits;
+            CacheSnapshot(int[] keys, Object[] values, int length, Level rootLevel) {
+                this.keys = keys;
+                this.values = values;
+                this.length = length;
+                this.rootLevel = rootLevel;
+            }
+        }
 
-        /** Number of bits in each level, each stored in a nibble. */
-        private int levelBitsList;
+        private volatile CacheSnapshot snapshot = new CacheSnapshot(new int[SIMPLE_LENGTH], new Object[SIMPLE_LENGTH], 0, null);
 
-        private Level rootLevel;
+        // Configuration fields, effectively final after constructor and published via ResourceCache.
+        private final int maxOffsetBits;
+        private final int levelBitsList;
 
         private static boolean storeDirectly(int size) {
             return size < LARGE_SIZE || CacheValue.futureInstancesWillBeStrong();
         }
 
         @SuppressWarnings("unchecked")
-        private static final Object putIfCleared(
-                Object[] values, int index, Object item, int size) {
+        private static final Object getIfCleared(Object[] values, int index) {
             Object value = values[index];
             if (!(value instanceof SoftReference)) {
-                // The caller should be consistent for each resource,
-                // that is, create equivalent objects of equal size every time,
-                // but the CacheValue "strength" may change over time.
-                // assert size < LARGE_SIZE;
                 return value;
             }
-            assert size >= LARGE_SIZE;
-            value = ((SoftReference<Object>) value).get();
-            if (value != null) {
-                return value;
-            }
-            values[index] =
-                    CacheValue.futureInstancesWillBeStrong() ? item : new SoftReference<>(item);
-            return item;
+            return ((SoftReference<Object>) value).get();
         }
 
+        /**
+         * Immutable Trie Level.
+         * Every update produces a new Level instance (Persistent Data Structure).
+         *
+         * DEVELOPER NOTE: This class uses Copy-On-Write (COW) semantics for its internal
+         * arrays. To ensure JMM safety for lock-free readers in get(), any modification
+         * must replace the entire path (spine) of Level nodes from the root down to
+         * the modified leaf. The final volatile write to the 'snapshot' field in
+         * ResourceCache serves as the publication point.
+         */
         private static final class Level {
-            int levelBitsList;
-            int shift;
-            int mask;
-            int[] keys;
-            Object[] values;
+            final int levelBitsList;
+            final int shift;
+            final int mask;
+            final int[] keys;
+            final Object[] values;
 
             Level(int levelBitsList, int shift) {
                 this.levelBitsList = levelBitsList;
@@ -1240,6 +1249,14 @@ public final class ICUResourceBundleReader {
                 values = new Object[length];
             }
 
+            private Level(int levelBitsList, int shift, int mask, int[] keys, Object[] values) {
+                this.levelBitsList = levelBitsList;
+                this.shift = shift;
+                this.mask = mask;
+                this.keys = keys;
+                this.values = values;
+            }
+
             Object get(int key) {
                 int index = (key >> shift) & mask;
                 int k = keys[index];
@@ -1247,72 +1264,98 @@ public final class ICUResourceBundleReader {
                     return values[index];
                 }
                 if (k == 0) {
-                    Level level = (Level) values[index];
-                    if (level != null) {
-                        return level.get(key);
+                    Object val = values[index];
+                    if (val instanceof Level) {
+                        return ((Level) val).get(key);
                     }
                 }
                 return null;
             }
 
-            Object putIfAbsent(int key, Object item, int size) {
+            Level putIfAbsent(int key, Object item, int size, Object[] result) {
                 int index = (key >> shift) & mask;
                 int k = keys[index];
                 if (k == key) {
-                    return putIfCleared(values, index, item, size);
-                }
-                if (k == 0) {
-                    Level level = (Level) values[index];
-                    if (level != null) {
-                        return level.putIfAbsent(key, item, size);
+                    Object value = getIfCleared(values, index);
+                    if (value != null) {
+                        result[0] = value;
+                        return this;
                     }
-                    keys[index] = key;
-                    values[index] = storeDirectly(size) ? item : new SoftReference<>(item);
-                    return item;
+                    // Replacement of a cleared SoftReference.
+                    // Even though this is just a re-fill, we create a new Level
+                    // to ensure that lock-free readers see the new reference atomically.
+                    // Optimization: share the keys array since it is immutable and hasn't changed.
+                    Object[] newValues = values.clone();
+                    newValues[index] = CacheValue.futureInstancesWillBeStrong() ? item : new SoftReference<>(item);
+                    result[0] = item;
+                    return new Level(levelBitsList, shift, mask, keys, newValues);
                 }
-                // Collision: Add a child level, move the old item there,
-                // and then insert the current item.
-                Level level = new Level(levelBitsList >> 4, shift + (levelBitsList & 0xf));
-                int i = (k >> level.shift) & level.mask;
-                level.keys[i] = k;
-                level.values[i] = values[index];
-                keys[index] = 0;
-                values[index] = level;
-                return level.putIfAbsent(key, item, size);
+
+                // Copy-On-Write for the arrays within this level
+                int[] newKeys = keys.clone();
+                Object[] newValues = values.clone();
+
+                if (k == 0) {
+                    Object val = values[index];
+                    if (val instanceof Level) {
+                        Level newLevel = ((Level) val).putIfAbsent(key, item, size, result);
+                        newValues[index] = newLevel;
+                        return new Level(levelBitsList, shift, mask, newKeys, newValues);
+                    }
+                    newKeys[index] = key;
+                    newValues[index] = storeDirectly(size) ? item : new SoftReference<>(item);
+                    result[0] = item;
+                    return new Level(levelBitsList, shift, mask, newKeys, newValues);
+                }
+
+                // Collision: Add a child level
+                Level subLevel = new Level(levelBitsList >> 4, shift + (levelBitsList & 0xf));
+                Object[] subResult = new Object[1];
+                // Move old item to sub-level
+                subLevel = subLevel.putIfAbsent(k, values[index], 0, subResult);
+                // Insert new item into sub-level
+                subLevel = subLevel.putIfAbsent(key, item, size, result);
+
+                newKeys[index] = 0;
+                newValues[index] = subLevel;
+                return new Level(levelBitsList, shift, mask, newKeys, newValues);
             }
         }
 
         ResourceCache(int maxOffset) {
             assert maxOffset != 0;
-            maxOffsetBits = 28;
+            int bits = 28;
             while (maxOffset <= 0x7ffffff) {
                 maxOffset <<= 1;
-                --maxOffsetBits;
+                --bits;
             }
+            maxOffsetBits = bits;
             int keyBits = maxOffsetBits + 2; // +2 for mini type: at most 30 bits used in a key
             // Precompute for each level the number of bits it handles.
+            int bitsList;
             if (keyBits <= ROOT_BITS) {
-                levelBitsList = keyBits;
+                bitsList = keyBits;
             } else if (keyBits < (ROOT_BITS + 3)) {
-                levelBitsList = 0x30 | (keyBits - 3);
+                bitsList = 0x30 | (keyBits - 3);
             } else {
-                levelBitsList = ROOT_BITS;
+                bitsList = ROOT_BITS;
                 keyBits -= ROOT_BITS;
                 int shift = 4;
                 for (; ; ) {
                     if (keyBits <= NEXT_BITS) {
-                        levelBitsList |= keyBits << shift;
+                        bitsList |= keyBits << shift;
                         break;
                     } else if (keyBits < (NEXT_BITS + 3)) {
-                        levelBitsList |= (0x30 | (keyBits - 3)) << shift;
+                        bitsList |= (0x30 | (keyBits - 3)) << shift;
                         break;
                     } else {
-                        levelBitsList |= NEXT_BITS << shift;
+                        bitsList |= NEXT_BITS << shift;
                         keyBits -= NEXT_BITS;
                         shift += 4;
                     }
                 }
             }
+            levelBitsList = bitsList;
         }
 
         /**
@@ -1337,25 +1380,26 @@ public final class ICUResourceBundleReader {
             return RES_GET_OFFSET(res) | (miniType << maxOffsetBits);
         }
 
-        private int findSimple(int key) {
+        private int findSimple(int[] keys, int length, int key) {
             return Arrays.binarySearch(keys, 0, length, key);
         }
 
         @SuppressWarnings("unchecked")
-        synchronized Object get(int res) {
+        Object get(int res) {
             // Integers and empty resources need not be cached.
             // The cache itself uses res=0 for "no match".
             assert RES_GET_OFFSET(res) != 0;
+            CacheSnapshot s = snapshot;
             Object value;
-            if (length >= 0) {
-                int index = findSimple(res);
+            if (s.length >= 0) {
+                int index = findSimple(s.keys, s.length, res);
                 if (index >= 0) {
-                    value = values[index];
+                    value = s.values[index];
                 } else {
                     return null;
                 }
             } else {
-                value = rootLevel.get(makeKey(res));
+                value = s.rootLevel.get(makeKey(res));
                 if (value == null) {
                     return null;
                 }
@@ -1367,32 +1411,50 @@ public final class ICUResourceBundleReader {
         }
 
         synchronized Object putIfAbsent(int res, Object item, int size) {
-            if (length >= 0) {
-                int index = findSimple(res);
+            CacheSnapshot s = snapshot;
+            if (s.length >= 0) {
+                int index = findSimple(s.keys, s.length, res);
                 if (index >= 0) {
-                    return putIfCleared(values, index, item, size);
-                } else if (length < SIMPLE_LENGTH) {
-                    index = ~index;
-                    if (index < length) {
-                        System.arraycopy(keys, index, keys, index + 1, length - index);
-                        System.arraycopy(values, index, values, index + 1, length - index);
+                    Object value = getIfCleared(s.values, index);
+                    if (value != null) {
+                        return value;
                     }
-                    ++length;
-                    keys[index] = res;
-                    values[index] = storeDirectly(size) ? item : new SoftReference<>(item);
+                    // Re-fill a cleared SoftReference in the simple array phase.
+                    // Copy-On-Write for the arrays ensures lock-free reader safety.
+                    Object[] newValues = s.values.clone();
+                    newValues[index] = CacheValue.futureInstancesWillBeStrong() ? item : new SoftReference<>(item);
+                    snapshot = new CacheSnapshot(s.keys, newValues, s.length, null);
+                    return item;
+                } else if (s.length < SIMPLE_LENGTH) {
+                    index = ~index;
+                    int[] newKeys = new int[SIMPLE_LENGTH];
+                    Object[] newValues = new Object[SIMPLE_LENGTH];
+                    System.arraycopy(s.keys, 0, newKeys, 0, s.length);
+                    System.arraycopy(s.values, 0, newValues, 0, s.length);
+                    if (index < s.length) {
+                        System.arraycopy(newKeys, index, newKeys, index + 1, s.length - index);
+                        System.arraycopy(newValues, index, newValues, index + 1, s.length - index);
+                    }
+                    newKeys[index] = res;
+                    newValues[index] = storeDirectly(size) ? item : new SoftReference<>(item);
+                    snapshot = new CacheSnapshot(newKeys, newValues, s.length + 1, null);
                     return item;
                 } else /* not found && length == SIMPLE_LENGTH */ {
                     // Grow to become trie-like.
-                    rootLevel = new Level(levelBitsList, 0);
+                    Level rootLevel = new Level(levelBitsList, 0);
+                    Object[] result = new Object[1];
                     for (int i = 0; i < SIMPLE_LENGTH; ++i) {
-                        rootLevel.putIfAbsent(makeKey(keys[i]), values[i], 0);
+                        rootLevel = rootLevel.putIfAbsent(makeKey(s.keys[i]), s.values[i], 0, result);
                     }
-                    keys = null;
-                    values = null;
-                    length = -1;
+                    rootLevel = rootLevel.putIfAbsent(makeKey(res), item, size, result);
+                    snapshot = new CacheSnapshot(null, null, -1, rootLevel);
+                    return item;
                 }
             }
-            return rootLevel.putIfAbsent(makeKey(res), item, size);
+            Object[] result = new Object[1];
+            Level newRoot = s.rootLevel.putIfAbsent(makeKey(res), item, size, result);
+            snapshot = new CacheSnapshot(null, null, -1, newRoot);
+            return result[0];
         }
     }
 
