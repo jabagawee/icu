@@ -1185,8 +1185,8 @@ public final class ICUResourceBundleReader {
         private static final int NEXT_BITS = 6;
 
         /**
-         * Immutable snapshot of the cache state.
-         * Implements the "Volatile Holder" pattern (Java Concurrency in Practice, 3.4.1).
+         * Immutable snapshot of the cache state. Implements the "Volatile Holder" pattern (Java
+         * Concurrency in Practice, 3.4.1).
          */
         private static final class CacheSnapshot {
             final int[] keys;
@@ -1202,9 +1202,11 @@ public final class ICUResourceBundleReader {
             }
         }
 
-        private volatile CacheSnapshot snapshot = new CacheSnapshot(new int[SIMPLE_LENGTH], new Object[SIMPLE_LENGTH], 0, null);
+        private volatile CacheSnapshot snapshot =
+                new CacheSnapshot(new int[SIMPLE_LENGTH], new Object[SIMPLE_LENGTH], 0, null);
 
-        // Configuration fields, effectively final after constructor and published via ResourceCache.
+        // Configuration fields, effectively final after constructor and published via
+        // ResourceCache.
         private final int maxOffsetBits;
         private final int levelBitsList;
 
@@ -1222,14 +1224,13 @@ public final class ICUResourceBundleReader {
         }
 
         /**
-         * Immutable Trie Level.
-         * Every update produces a new Level instance (Persistent Data Structure).
+         * Immutable Trie Level. Every update produces a new Level instance (Persistent Data
+         * Structure).
          *
-         * DEVELOPER NOTE: This class uses Copy-On-Write (COW) semantics for its internal
-         * arrays. To ensure JMM safety for lock-free readers in get(), any modification
-         * must replace the entire path (spine) of Level nodes from the root down to
-         * the modified leaf. The final volatile write to the 'snapshot' field in
-         * ResourceCache serves as the publication point.
+         * <p>DEVELOPER NOTE: This class uses Copy-On-Write (COW) semantics for its internal arrays.
+         * To ensure JMM safety for lock-free readers in get(), any modification must replace the
+         * entire path (spine) of Level nodes from the root down to the modified leaf. The final
+         * volatile write to the 'snapshot' field in ResourceCache serves as the publication point.
          */
         private static final class Level {
             final int levelBitsList;
@@ -1286,7 +1287,10 @@ public final class ICUResourceBundleReader {
                     // to ensure that lock-free readers see the new reference atomically.
                     // Optimization: share the keys array since it is immutable and hasn't changed.
                     Object[] newValues = values.clone();
-                    newValues[index] = CacheValue.futureInstancesWillBeStrong() ? item : new SoftReference<>(item);
+                    newValues[index] =
+                            CacheValue.futureInstancesWillBeStrong()
+                                    ? item
+                                    : new SoftReference<>(item);
                     result[0] = item;
                     return new Level(levelBitsList, shift, mask, keys, newValues);
                 }
@@ -1422,7 +1426,10 @@ public final class ICUResourceBundleReader {
                     // Re-fill a cleared SoftReference in the simple array phase.
                     // Copy-On-Write for the arrays ensures lock-free reader safety.
                     Object[] newValues = s.values.clone();
-                    newValues[index] = CacheValue.futureInstancesWillBeStrong() ? item : new SoftReference<>(item);
+                    newValues[index] =
+                            CacheValue.futureInstancesWillBeStrong()
+                                    ? item
+                                    : new SoftReference<>(item);
                     snapshot = new CacheSnapshot(s.keys, newValues, s.length, null);
                     return item;
                 } else if (s.length < SIMPLE_LENGTH) {
@@ -1444,7 +1451,8 @@ public final class ICUResourceBundleReader {
                     Level rootLevel = new Level(levelBitsList, 0);
                     Object[] result = new Object[1];
                     for (int i = 0; i < SIMPLE_LENGTH; ++i) {
-                        rootLevel = rootLevel.putIfAbsent(makeKey(s.keys[i]), s.values[i], 0, result);
+                        rootLevel =
+                                rootLevel.putIfAbsent(makeKey(s.keys[i]), s.values[i], 0, result);
                     }
                     rootLevel = rootLevel.putIfAbsent(makeKey(res), item, size, result);
                     snapshot = new CacheSnapshot(null, null, -1, rootLevel);
