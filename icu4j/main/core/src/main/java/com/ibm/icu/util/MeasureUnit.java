@@ -746,7 +746,7 @@ public class MeasureUnit implements Serializable {
      */
     @Override
     public int hashCode() {
-        return 31 * type.hashCode() + subType.hashCode();
+        return getIdentifier().hashCode();
     }
 
     /**
