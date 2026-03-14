@@ -9,7 +9,6 @@ import com.ibm.icu.impl.UResource;
 import com.ibm.icu.util.ULocale;
 import com.ibm.icu.util.UResourceBundle;
 import com.ibm.icu.util.UResourceTypeMismatchException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,12 +19,6 @@ public class StandardPluralRanges {
 
     StandardPlural[] flatTriples;
     int numTriples = 0;
-
-    /**
-     * An immutable map from language codes to set IDs. Pre-computed and cached in Java since it is
-     * used as a cache key for PluralRules.
-     */
-    private static volatile Map<String, String> languageToSet;
 
     /** An empty StandardPluralRanges instance. */
     public static final StandardPluralRanges DEFAULT = new StandardPluralRanges();
@@ -52,12 +45,15 @@ public class StandardPluralRanges {
         }
     }
 
-    private static Map<String, String> getLanguageToSet() {
-        Map<String, String> candidate = languageToSet;
-        if (candidate == null) {
-            synchronized (StandardPluralRanges.class) {
-            candidate = languageToSet;
-            if (candidate == null) {
+    /**
+     * Holds the language-to-set map, loaded once from ICU resource bundles. Uses the holder class
+     * idiom (JLS 12.4.2) for thread-safe lazy initialization without synchronization on the read
+     * path.
+     */
+    private static final class LanguageToSetHolder {
+        static final Map<String, String> INSTANCE;
+
+        static {
             Map<String, String> map = new HashMap<String, String>();
             PluralRangeSetsDataSink sink = new PluralRangeSetsDataSink(map);
             ICUResourceBundle resource =
@@ -65,12 +61,12 @@ public class StandardPluralRanges {
                             UResourceBundle.getBundleInstance(
                                     ICUData.ICU_BASE_NAME, "pluralRanges");
             resource.getAllItemsWithFallback("locales", sink);
-            candidate = Collections.unmodifiableMap(map);
-            languageToSet = candidate;
-            }
-            }
+            INSTANCE = Map.copyOf(map);
         }
-        return languageToSet;
+    }
+
+    private static Map<String, String> getLanguageToSet() {
+        return LanguageToSetHolder.INSTANCE;
     }
 
     private static final class PluralRangesDataSink extends UResource.Sink {
