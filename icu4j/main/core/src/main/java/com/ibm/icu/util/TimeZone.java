@@ -956,8 +956,7 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
         TimeZone tmpDefaultZone = defaultZone;
 
         if (tmpDefaultZone == null) {
-            synchronized (java.util.TimeZone.class) {
-                synchronized (TimeZone.class) {
+            synchronized (defaultZoneLock) {
                     tmpDefaultZone = defaultZone;
                     if (tmpDefaultZone == null) {
                         if (TZ_IMPL == TIMEZONE_JDK) {
@@ -968,7 +967,6 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
                         }
                         defaultZone = tmpDefaultZone;
                     }
-                }
             }
         }
 
@@ -984,7 +982,8 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
      * @param tz the new default time zone
      * @stable ICU 2.0
      */
-    public static synchronized void setDefault(TimeZone tz) {
+    public static void setDefault(TimeZone tz) {
+        synchronized (defaultZoneLock) {
         // Set default ICU time zone, used by #getDefault()
         setICUDefault(tz);
 
@@ -1024,6 +1023,7 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
             }
             java.util.TimeZone.setDefault(jdkZone);
         }
+        }
     }
 
     /**
@@ -1037,7 +1037,8 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
      * @deprecated This API is ICU internal only.
      */
     @Deprecated
-    public static synchronized void setICUDefault(TimeZone tz) {
+    public static void setICUDefault(TimeZone tz) {
+        synchronized (defaultZoneLock) {
         if (tz == null) {
             defaultZone = null;
         } else if (tz.isFrozen()) {
@@ -1046,6 +1047,7 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
         } else {
             // Creates a defensive copy and freeze it
             defaultZone = tz.clone().freeze();
+        }
         }
     }
 
@@ -1398,8 +1400,19 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
     /** The default time zone, or null if not set. */
     private static volatile TimeZone defaultZone = null;
 
+    /**
+     * Private lock object for defaultZone access.
+     *
+     * <p>Lock ordering: {@code defaultZoneLock} may be held when calling {@code
+     * java.util.TimeZone.setDefault()}, which internally synchronizes on {@code
+     * java.util.TimeZone.class}. Code that holds {@code java.util.TimeZone.class} must not call
+     * ICU's {@code TimeZone.getDefault()} or {@code setDefault()}. In practice this is safe because
+     * the JDK's TimeZone implementation does not call into ICU.
+     */
+    private static final Object defaultZoneLock = new Object();
+
     /** TimeZone implementation type */
-    private static int TZ_IMPL = TIMEZONE_ICU;
+    private static volatile int TZ_IMPL = TIMEZONE_ICU;
 
     /** TimeZone implementation type initialization */
     private static final String TZIMPL_CONFIG_KEY = "com.ibm.icu.util.TimeZone.DefaultTimeZoneType";
