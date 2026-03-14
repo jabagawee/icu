@@ -24,10 +24,10 @@ import java.util.List;
  */
 public final class CharsetProviderICU extends CharsetProvider {
     /**
-     * Holds the list of available ICU Charsets, loaded once. Uses the holder class idiom
-     * (JLS 12.4.2) for thread-safe lazy initialization. Not a Set or Map, so that we can add
-     * different Charset objects with the same name(), which means that they are .equals().
-     * See ICU ticket #11493.
+     * Holds the list of available ICU Charsets, loaded once. Uses the holder class idiom (JLS
+     * 12.4.2) for thread-safe lazy initialization. Not a Set or Map, so that we can add different
+     * Charset objects with the same name(), which means that they are .equals(). See ICU ticket
+     * #11493.
      */
     private static final class AvailableCharsetsHolder {
         static final List<Charset> INSTANCE;

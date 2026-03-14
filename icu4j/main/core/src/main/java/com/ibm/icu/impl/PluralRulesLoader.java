@@ -178,26 +178,26 @@ public class PluralRulesLoader extends PluralRules.Factory {
 
         // Cache miss: parse the rules
         PluralRules newRules = null;
-            try {
-                UResourceBundle pluralb = getPluralBundle();
-                UResourceBundle rulesb = pluralb.get("rules");
-                UResourceBundle setb = rulesb.get(rulesId);
+        try {
+            UResourceBundle pluralb = getPluralBundle();
+            UResourceBundle rulesb = pluralb.get("rules");
+            UResourceBundle setb = rulesb.get(rulesId);
 
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < setb.getSize(); ++i) {
-                    UResourceBundle b = setb.get(i);
-                    if (i > 0) {
-                        sb.append("; ");
-                    }
-                    sb.append(b.getKey());
-                    sb.append(": ");
-                    sb.append(b.getString());
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < setb.getSize(); ++i) {
+                UResourceBundle b = setb.get(i);
+                if (i > 0) {
+                    sb.append("; ");
                 }
-                StandardPluralRanges ranges = StandardPluralRanges.forSet(rangesId);
-                newRules = PluralRules.newInternal(sb.toString(), ranges);
-            } catch (ParseException e) {
-            } catch (MissingResourceException e) {
+                sb.append(b.getKey());
+                sb.append(": ");
+                sb.append(b.getString());
             }
+            StandardPluralRanges ranges = StandardPluralRanges.forSet(rangesId);
+            newRules = PluralRules.newInternal(sb.toString(), ranges);
+        } catch (ParseException e) {
+        } catch (MissingResourceException e) {
+        }
 
         // Store in cache; use sentinel for null since ConcurrentHashMap doesn't allow null values
         PluralRules toStore = (newRules != null) ? newRules : NULL_RULES;

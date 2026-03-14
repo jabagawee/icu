@@ -106,17 +106,17 @@ class CaseFoldTransliterator extends Transliterator {
     public void addSourceTargetSet(
             UnicodeSet inputFilter, UnicodeSet sourceSet, UnicodeSet targetSet) {
         if (sourceTargetUtility == null) {
-        synchronized (CaseFoldTransliterator.class) {
-            if (sourceTargetUtility == null) {
-                sourceTargetUtility =
-                        new SourceTargetUtility(
-                                new Transform<String, String>() {
-                                    @Override
-                                    public String transform(String source) {
-                                        return UCharacter.foldCase(source, true);
-                                    }
-                                });
-            }
+            synchronized (CaseFoldTransliterator.class) {
+                if (sourceTargetUtility == null) {
+                    sourceTargetUtility =
+                            new SourceTargetUtility(
+                                    new Transform<String, String>() {
+                                        @Override
+                                        public String transform(String source) {
+                                            return UCharacter.foldCase(source, true);
+                                        }
+                                    });
+                }
             }
         }
         sourceTargetUtility.addSourceTargetSet(this, inputFilter, sourceSet, targetSet);

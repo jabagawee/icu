@@ -92,11 +92,11 @@ public class LocaleDisplayNamesImpl extends LocaleDisplayNames {
     }
 
     public static LocaleDisplayNames getInstance(ULocale locale, DialectHandling dialectHandling) {
-            return cache.get(locale, dialectHandling);
+        return cache.get(locale, dialectHandling);
     }
 
     public static LocaleDisplayNames getInstance(ULocale locale, DisplayContext... contexts) {
-            return cache.get(locale, contexts);
+        return cache.get(locale, contexts);
     }
 
     private final class CapitalizationContextSink extends UResource.Sink {
@@ -852,10 +852,10 @@ public class LocaleDisplayNamesImpl extends LocaleDisplayNames {
                     DisplayContext nameLength,
                     DisplayContext substituteHandling) {
                 return dialectHandling == this.dialectHandling
-                    && capitalization == this.capitalization
-                    && nameLength == this.nameLength
-                    && substituteHandling == this.substituteHandling
-                    && locale.equals(this.locale);
+                        && capitalization == this.capitalization
+                        && nameLength == this.nameLength
+                        && substituteHandling == this.substituteHandling
+                        && locale.equals(this.locale);
             }
         }
 

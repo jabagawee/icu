@@ -1946,18 +1946,18 @@ public class TimeZoneFormat extends UFormat
         String region = _region;
         if (region == null) {
             synchronized (this) {
-            region = _region;
-            if (region == null) {
-            region = _locale.getCountry();
-            if (region.length() == 0) {
-                ULocale tmp = ULocale.addLikelySubtags(_locale);
-                region = tmp.getCountry();
-                if (region.length() == 0) {
-                    region = "001";
+                region = _region;
+                if (region == null) {
+                    region = _locale.getCountry();
+                    if (region.length() == 0) {
+                        ULocale tmp = ULocale.addLikelySubtags(_locale);
+                        region = tmp.getCountry();
+                        if (region.length() == 0) {
+                            region = "001";
+                        }
+                    }
+                    _region = region;
                 }
-            }
-            _region = region;
-            }
             }
         }
         return _region;

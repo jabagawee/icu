@@ -1051,8 +1051,7 @@ public class SimpleDateFormat extends DateFormat implements Cloneable {
                 if (patternsRb == null || patternsRb.getSize() < 9) {
                     pattern = FALLBACKPATTERN;
                 } else {
-                    String basePattern =
-                            Calendar.getDateAtTimePattern(cal, defaultLocale, SHORT);
+                    String basePattern = Calendar.getDateAtTimePattern(cal, defaultLocale, SHORT);
 
                     pattern =
                             SimpleFormatterImpl.formatRawPattern(

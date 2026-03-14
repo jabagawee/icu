@@ -42,8 +42,7 @@ public class CorrectnessFixConcurrencyTest extends ConcurrencyTest {
     @Test
     public void testRelativeDateTimeFormatterConcurrent() throws Exception {
         // Share a single instance across threads to exercise the synchronized(numberFormat) fix.
-        RelativeDateTimeFormatter fmt =
-                RelativeDateTimeFormatter.getInstance(ULocale.ENGLISH);
+        RelativeDateTimeFormatter fmt = RelativeDateTimeFormatter.getInstance(ULocale.ENGLISH);
         runConcurrent(
                 "RelativeDateTimeFormatter",
                 tid -> {

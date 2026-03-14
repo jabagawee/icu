@@ -130,15 +130,15 @@ public final class CharacterProperties {
             throw new IllegalArgumentException(
                     "" + property + " is not a constant for a UProperty binary property");
         }
-            UnicodeSet set = sets.get(property);
-            if (set == null) {
-                set = makeSet(property);
-                // Race is benign: frozen UnicodeSet is immutable, duplicate computation is harmless
-                if (!sets.compareAndSet(property, null, set)) {
-                    set = sets.get(property);
-                }
+        UnicodeSet set = sets.get(property);
+        if (set == null) {
+            set = makeSet(property);
+            // Race is benign: frozen UnicodeSet is immutable, duplicate computation is harmless
+            if (!sets.compareAndSet(property, null, set)) {
+                set = sets.get(property);
             }
-            return set;
+        }
+        return set;
     }
 
     /**
@@ -162,15 +162,15 @@ public final class CharacterProperties {
             throw new IllegalArgumentException(
                     "" + property + " is not a constant for a UProperty int property");
         }
-            int idx = property - UProperty.INT_START;
-            CodePointMap map = maps.get(idx);
-            if (map == null) {
-                map = makeMap(property);
-                // Race is benign: CodePointMap is immutable, duplicate computation is harmless
-                if (!maps.compareAndSet(idx, null, map)) {
-                    map = maps.get(idx);
-                }
+        int idx = property - UProperty.INT_START;
+        CodePointMap map = maps.get(idx);
+        if (map == null) {
+            map = makeMap(property);
+            // Race is benign: CodePointMap is immutable, duplicate computation is harmless
+            if (!maps.compareAndSet(idx, null, map)) {
+                map = maps.get(idx);
             }
-            return map;
+        }
+        return map;
     }
 }

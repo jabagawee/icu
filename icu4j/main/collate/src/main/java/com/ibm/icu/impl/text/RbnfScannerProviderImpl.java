@@ -16,7 +16,6 @@ import com.ibm.icu.text.RbnfLenientScanner;
 import com.ibm.icu.text.RbnfLenientScannerProvider;
 import com.ibm.icu.text.RuleBasedCollator;
 import com.ibm.icu.util.ULocale;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -76,13 +75,13 @@ public class RbnfScannerProviderImpl implements RbnfLenientScannerProvider {
         // Avoid computeIfAbsent: createScanner() constructs a RuleBasedCollator (expensive)
         // and would hold the ConcurrentHashMap bin lock for the entire duration. Using
         // get-then-putIfAbsent allows parallel construction with benign last-write-wins.
-            result = cache.get(key);
-            if (result != null) {
-                return result;
-            }
+        result = cache.get(key);
+        if (result != null) {
+            return result;
+        }
         result = createScanner(locale, extras);
-            RbnfLenientScanner existing = cache.putIfAbsent(key, result);
-            return existing != null ? existing : result;
+        RbnfLenientScanner existing = cache.putIfAbsent(key, result);
+        return existing != null ? existing : result;
     }
 
     /**

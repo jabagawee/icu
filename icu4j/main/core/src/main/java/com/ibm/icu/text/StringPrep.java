@@ -342,17 +342,17 @@ public final class StringPrep {
                 ref = CACHE.get(profile);
                 instance = (ref != null) ? ref.get() : null;
                 if (instance == null) {
-                ByteBuffer bytes = ICUBinary.getRequiredData(PROFILE_NAMES[profile] + ".spp");
-                if (bytes != null) {
-                    try {
-                        instance = new StringPrep(bytes);
-                    } catch (IOException e) {
-                        throw new ICUUncheckedIOException(e);
+                    ByteBuffer bytes = ICUBinary.getRequiredData(PROFILE_NAMES[profile] + ".spp");
+                    if (bytes != null) {
+                        try {
+                            instance = new StringPrep(bytes);
+                        } catch (IOException e) {
+                            throw new ICUUncheckedIOException(e);
+                        }
                     }
-                }
-                if (instance != null) {
-                    CACHE.set(profile, new WeakReference<>(instance));
-                }
+                    if (instance != null) {
+                        CACHE.set(profile, new WeakReference<>(instance));
+                    }
                 }
             }
         }

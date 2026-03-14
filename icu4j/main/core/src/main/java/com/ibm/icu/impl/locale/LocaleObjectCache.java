@@ -67,7 +67,7 @@ public abstract class LocaleObjectCache<K, V> {
                     return oldVal;
                 }
                 // SoftReference was cleared; replace with our new entry
-            _map.put(key, newEntry);
+                _map.put(key, newEntry);
             }
             // clean recycled SoftReferences again
             cleanStaleEntries();

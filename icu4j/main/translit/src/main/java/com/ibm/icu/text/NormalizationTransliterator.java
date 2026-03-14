@@ -171,15 +171,15 @@ final class NormalizationTransliterator extends Transliterator {
         // Avoid computeIfAbsent: SourceTargetUtility construction scans the entire Unicode
         // code point space (expensive) and would hold the ConcurrentHashMap bin lock. Using
         // get-then-putIfAbsent allows parallel construction with benign last-write-wins.
-            // String id = getID();
-            cache = SOURCE_CACHE.get(norm2);
-            if (cache == null) {
-                cache = new SourceTargetUtility(new NormalizingTransform(norm2), norm2);
-                SourceTargetUtility existing = SOURCE_CACHE.putIfAbsent(norm2, cache);
-                if (existing != null) {
-                    cache = existing;
-                }
+        // String id = getID();
+        cache = SOURCE_CACHE.get(norm2);
+        if (cache == null) {
+            cache = new SourceTargetUtility(new NormalizingTransform(norm2), norm2);
+            SourceTargetUtility existing = SOURCE_CACHE.putIfAbsent(norm2, cache);
+            if (existing != null) {
+                cache = existing;
             }
+        }
         cache.addSourceTargetSet(this, inputFilter, sourceSet, targetSet);
     }
 }

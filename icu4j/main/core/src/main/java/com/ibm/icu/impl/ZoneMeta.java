@@ -62,21 +62,21 @@ public final class ZoneMeta {
         Set<String> systemZones = (ref != null) ? ref.get() : null;
         if (systemZones == null) {
             synchronized (ZoneMeta.class) {
-            ref = REF_SYSTEM_ZONES;
-            systemZones = (ref != null) ? ref.get() : null;
-            if (systemZones == null) {
-            Set<String> systemIDs = new TreeSet<>();
-            String[] allIDs = getZoneIDs();
-            for (String id : allIDs) {
-                // exclude Etc/Unknown
-                if (id.equals(TimeZone.UNKNOWN_ZONE_ID)) {
-                    continue;
+                ref = REF_SYSTEM_ZONES;
+                systemZones = (ref != null) ? ref.get() : null;
+                if (systemZones == null) {
+                    Set<String> systemIDs = new TreeSet<>();
+                    String[] allIDs = getZoneIDs();
+                    for (String id : allIDs) {
+                        // exclude Etc/Unknown
+                        if (id.equals(TimeZone.UNKNOWN_ZONE_ID)) {
+                            continue;
+                        }
+                        systemIDs.add(id);
+                    }
+                    systemZones = Set.copyOf(systemIDs);
+                    REF_SYSTEM_ZONES = new SoftReference<>(systemZones);
                 }
-                systemIDs.add(id);
-            }
-            systemZones = Set.copyOf(systemIDs);
-            REF_SYSTEM_ZONES = new SoftReference<>(systemZones);
-            }
             }
         }
         return systemZones;
@@ -93,24 +93,24 @@ public final class ZoneMeta {
         Set<String> canonicalSystemZones = (ref != null) ? ref.get() : null;
         if (canonicalSystemZones == null) {
             synchronized (ZoneMeta.class) {
-            ref = REF_CANONICAL_SYSTEM_ZONES;
-            canonicalSystemZones = (ref != null) ? ref.get() : null;
-            if (canonicalSystemZones == null) {
-            Set<String> canonicalSystemIDs = new TreeSet<>();
-            String[] allIDs = getZoneIDs();
-            for (String id : allIDs) {
-                // exclude Etc/Unknown
-                if (id.equals(TimeZone.UNKNOWN_ZONE_ID)) {
-                    continue;
+                ref = REF_CANONICAL_SYSTEM_ZONES;
+                canonicalSystemZones = (ref != null) ? ref.get() : null;
+                if (canonicalSystemZones == null) {
+                    Set<String> canonicalSystemIDs = new TreeSet<>();
+                    String[] allIDs = getZoneIDs();
+                    for (String id : allIDs) {
+                        // exclude Etc/Unknown
+                        if (id.equals(TimeZone.UNKNOWN_ZONE_ID)) {
+                            continue;
+                        }
+                        String canonicalID = getCanonicalCLDRID(id);
+                        if (id.equals(canonicalID)) {
+                            canonicalSystemIDs.add(id);
+                        }
+                    }
+                    canonicalSystemZones = Set.copyOf(canonicalSystemIDs);
+                    REF_CANONICAL_SYSTEM_ZONES = new SoftReference<>(canonicalSystemZones);
                 }
-                String canonicalID = getCanonicalCLDRID(id);
-                if (id.equals(canonicalID)) {
-                    canonicalSystemIDs.add(id);
-                }
-            }
-            canonicalSystemZones = Set.copyOf(canonicalSystemIDs);
-            REF_CANONICAL_SYSTEM_ZONES = new SoftReference<>(canonicalSystemZones);
-            }
             }
         }
         return canonicalSystemZones;
@@ -129,27 +129,28 @@ public final class ZoneMeta {
         Set<String> canonicalSystemLocationZones = (ref != null) ? ref.get() : null;
         if (canonicalSystemLocationZones == null) {
             synchronized (ZoneMeta.class) {
-            ref = REF_CANONICAL_SYSTEM_LOCATION_ZONES;
-            canonicalSystemLocationZones = (ref != null) ? ref.get() : null;
-            if (canonicalSystemLocationZones == null) {
-            Set<String> canonicalSystemLocationIDs = new TreeSet<>();
-            String[] allIDs = getZoneIDs();
-            for (String id : allIDs) {
-                // exclude Etc/Unknown
-                if (id.equals(TimeZone.UNKNOWN_ZONE_ID)) {
-                    continue;
-                }
-                String canonicalID = getCanonicalCLDRID(id);
-                if (id.equals(canonicalID)) {
-                    String region = getRegion(id);
-                    if (region != null && !region.equals(kWorld)) {
-                        canonicalSystemLocationIDs.add(id);
+                ref = REF_CANONICAL_SYSTEM_LOCATION_ZONES;
+                canonicalSystemLocationZones = (ref != null) ? ref.get() : null;
+                if (canonicalSystemLocationZones == null) {
+                    Set<String> canonicalSystemLocationIDs = new TreeSet<>();
+                    String[] allIDs = getZoneIDs();
+                    for (String id : allIDs) {
+                        // exclude Etc/Unknown
+                        if (id.equals(TimeZone.UNKNOWN_ZONE_ID)) {
+                            continue;
+                        }
+                        String canonicalID = getCanonicalCLDRID(id);
+                        if (id.equals(canonicalID)) {
+                            String region = getRegion(id);
+                            if (region != null && !region.equals(kWorld)) {
+                                canonicalSystemLocationIDs.add(id);
+                            }
+                        }
                     }
+                    canonicalSystemLocationZones = Set.copyOf(canonicalSystemLocationIDs);
+                    REF_CANONICAL_SYSTEM_LOCATION_ZONES =
+                            new SoftReference<>(canonicalSystemLocationZones);
                 }
-            }
-            canonicalSystemLocationZones = Set.copyOf(canonicalSystemLocationIDs);
-            REF_CANONICAL_SYSTEM_LOCATION_ZONES = new SoftReference<>(canonicalSystemLocationZones);
-            }
             }
         }
         return canonicalSystemLocationZones;
@@ -292,23 +293,23 @@ public final class ZoneMeta {
         String[] ids = ZONEIDS;
         if (ids == null) {
             synchronized (ZoneMeta.class) {
-            ids = ZONEIDS;
-            if (ids == null) {
-            try {
-                UResourceBundle top =
-                        UResourceBundle.getBundleInstance(
-                                ICUData.ICU_BASE_NAME,
-                                ZONEINFORESNAME,
-                                ICUResourceBundle.ICU_DATA_CLASS_LOADER);
-                ids = top.getStringArray(kNAMES);
-            } catch (MissingResourceException ex) {
-                // throw away..
-            }
-            if (ids == null) {
-                ids = new String[0];
-            }
-            ZONEIDS = ids;
-            }
+                ids = ZONEIDS;
+                if (ids == null) {
+                    try {
+                        UResourceBundle top =
+                                UResourceBundle.getBundleInstance(
+                                        ICUData.ICU_BASE_NAME,
+                                        ZONEINFORESNAME,
+                                        ICUResourceBundle.ICU_DATA_CLASS_LOADER);
+                        ids = top.getStringArray(kNAMES);
+                    } catch (MissingResourceException ex) {
+                        // throw away..
+                    }
+                    if (ids == null) {
+                        ids = new String[0];
+                    }
+                    ZONEIDS = ids;
+                }
             }
         }
         return ZONEIDS;

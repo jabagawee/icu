@@ -120,7 +120,7 @@ final class UConverterAlias {
                 return true;
             }
 
-        /* load converter alias data from file if necessary */
+            /* load converter alias data from file if necessary */
             int[] tableArray = null;
             int tableStart;
 

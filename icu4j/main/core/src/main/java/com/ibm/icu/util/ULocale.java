@@ -690,20 +690,20 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
      * @stable ICU 49
      */
     public static ULocale getDefault(Category category) {
-            int idx = category.ordinal();
-            // Single volatile read: atomic snapshot of both arrays
-            DefaultCategoryState state = defaultCategoryState;
-            if (state == null || state.ulocales[idx] == null) {
-                // Just in case this method is called during ULocale class
-                // initialization. Unlike getDefault(), we do not have
-                // cyclic dependency for category default.
-                return ULocale.ROOT;
-            }
-            if (JDKLocaleHelper.hasLocaleCategories()) {
-                Locale currentCategoryDefault = JDKLocaleHelper.getDefault(category);
-                if (!state.locales[idx].equals(currentCategoryDefault)) {
-                    // Rare path: JDK default changed. Take the lock to update.
-                    synchronized (ULocale.class) {
+        int idx = category.ordinal();
+        // Single volatile read: atomic snapshot of both arrays
+        DefaultCategoryState state = defaultCategoryState;
+        if (state == null || state.ulocales[idx] == null) {
+            // Just in case this method is called during ULocale class
+            // initialization. Unlike getDefault(), we do not have
+            // cyclic dependency for category default.
+            return ULocale.ROOT;
+        }
+        if (JDKLocaleHelper.hasLocaleCategories()) {
+            Locale currentCategoryDefault = JDKLocaleHelper.getDefault(category);
+            if (!state.locales[idx].equals(currentCategoryDefault)) {
+                // Rare path: JDK default changed. Take the lock to update.
+                synchronized (ULocale.class) {
                     state = defaultCategoryState;
                     if (!state.locales[idx].equals(currentCategoryDefault)) {
                         Locale[] newLocales = state.locales.clone();
@@ -713,25 +713,25 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                         state = new DefaultCategoryState(newLocales, newULocales);
                         defaultCategoryState = state;
                     }
-                    }
-                    return state.ulocales[idx];
                 }
-            } else {
-                // java.util.Locale.setDefault(Locale) in Java 7 updates
-                // category locale defaults. On Android API level 21..23
-                // ICU4J checks if the default locale has changed and update
-                // category ULocales here if necessary.
+                return state.ulocales[idx];
+            }
+        } else {
+            // java.util.Locale.setDefault(Locale) in Java 7 updates
+            // category locale defaults. On Android API level 21..23
+            // ICU4J checks if the default locale has changed and update
+            // category ULocales here if necessary.
 
-                // Note: When java.util.Locale.setDefault(Locale) is called
-                // with a Locale same with the previous one, Java 7 still
-                // updates category locale defaults. On Android API level 21..23
-                // there is no good way to detect the event, ICU4J simply
-                // checks if the default Java Locale has changed since last
-                // time.
+            // Note: When java.util.Locale.setDefault(Locale) is called
+            // with a Locale same with the previous one, Java 7 still
+            // updates category locale defaults. On Android API level 21..23
+            // there is no good way to detect the event, ICU4J simply
+            // checks if the default Java Locale has changed since last
+            // time.
 
-                Locale currentDefault = Locale.getDefault();
-                if (!defaultULocale.locale.equals(currentDefault)) {
-                    synchronized (ULocale.class) {
+            Locale currentDefault = Locale.getDefault();
+            if (!defaultULocale.locale.equals(currentDefault)) {
+                synchronized (ULocale.class) {
                     state = defaultCategoryState;
                     if (!defaultULocale.locale.equals(currentDefault)) {
                         defaultULocale = forLocale(currentDefault);
@@ -745,14 +745,14 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                         state = new DefaultCategoryState(newLocales, newULocales);
                         defaultCategoryState = state;
                     }
-                    }
-                    return state.ulocales[idx];
                 }
-
-                // No synchronization with JDK Locale, because category default
-                // is not supported in Android API level 21..23.
+                return state.ulocales[idx];
             }
-            return state.ulocales[idx];
+
+            // No synchronization with JDK Locale, because category default
+            // is not supported in Android API level 21..23.
+        }
+        return state.ulocales[idx];
     }
 
     /**
@@ -1460,108 +1460,108 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
             static final Map<String, String> subdivisionAliasMap;
 
             static {
-            Map<String, String> language = new HashMap<>();
-            Map<String, String> script = new HashMap<>();
-            Map<String, List<String>> territory = new HashMap<>();
-            Map<String, String> variant = new HashMap<>();
-            Map<String, String> subdivision = new HashMap<>();
+                Map<String, String> language = new HashMap<>();
+                Map<String, String> script = new HashMap<>();
+                Map<String, List<String>> territory = new HashMap<>();
+                Map<String, String> variant = new HashMap<>();
+                Map<String, String> subdivision = new HashMap<>();
 
-            UResourceBundle metadata =
-                    UResourceBundle.getBundleInstance(
-                            ICUData.ICU_BASE_NAME,
-                            "metadata",
-                            ICUResourceBundle.ICU_DATA_CLASS_LOADER);
-            UResourceBundle metadataAlias = metadata.get("alias");
-            UResourceBundle languageAlias = metadataAlias.get("language");
-            UResourceBundle scriptAlias = metadataAlias.get("script");
-            UResourceBundle territoryAlias = metadataAlias.get("territory");
-            UResourceBundle variantAlias = metadataAlias.get("variant");
-            UResourceBundle subdivisionAlias = metadataAlias.get("subdivision");
+                UResourceBundle metadata =
+                        UResourceBundle.getBundleInstance(
+                                ICUData.ICU_BASE_NAME,
+                                "metadata",
+                                ICUResourceBundle.ICU_DATA_CLASS_LOADER);
+                UResourceBundle metadataAlias = metadata.get("alias");
+                UResourceBundle languageAlias = metadataAlias.get("language");
+                UResourceBundle scriptAlias = metadataAlias.get("script");
+                UResourceBundle territoryAlias = metadataAlias.get("territory");
+                UResourceBundle variantAlias = metadataAlias.get("variant");
+                UResourceBundle subdivisionAlias = metadataAlias.get("subdivision");
 
-            for (int i = 0; i < languageAlias.getSize(); i++) {
-                UResourceBundle res = languageAlias.get(i);
-                String aliasFrom = res.getKey();
-                String aliasTo = res.get("replacement").getString();
-                Locale testLocale = new Locale(aliasFrom);
-                // if there are script in the aliasFrom
-                // or we have both a und as language and a region code.
-                if (!testLocale.getScript().isEmpty()
-                        || (aliasFrom.startsWith("und") && !testLocale.getCountry().isEmpty())) {
-                    throw new IllegalArgumentException(
-                            "key ["
-                                    + aliasFrom
-                                    + "] in alias:language contains unsupported fields combination.");
+                for (int i = 0; i < languageAlias.getSize(); i++) {
+                    UResourceBundle res = languageAlias.get(i);
+                    String aliasFrom = res.getKey();
+                    String aliasTo = res.get("replacement").getString();
+                    Locale testLocale = new Locale(aliasFrom);
+                    // if there are script in the aliasFrom
+                    // or we have both a und as language and a region code.
+                    if (!testLocale.getScript().isEmpty()
+                            || (aliasFrom.startsWith("und")
+                                    && !testLocale.getCountry().isEmpty())) {
+                        throw new IllegalArgumentException(
+                                "key ["
+                                        + aliasFrom
+                                        + "] in alias:language contains unsupported fields combination.");
+                    }
+                    language.put(aliasFrom, aliasTo);
                 }
-            language.put(aliasFrom, aliasTo);
-            }
-            for (int i = 0; i < scriptAlias.getSize(); i++) {
-                UResourceBundle res = scriptAlias.get(i);
-                String aliasFrom = res.getKey();
-                String aliasTo = res.get("replacement").getString();
-                if (aliasFrom.length() != 4) {
-                    throw new IllegalArgumentException(
-                            "Incorrect key [" + aliasFrom + "] in alias:script.");
+                for (int i = 0; i < scriptAlias.getSize(); i++) {
+                    UResourceBundle res = scriptAlias.get(i);
+                    String aliasFrom = res.getKey();
+                    String aliasTo = res.get("replacement").getString();
+                    if (aliasFrom.length() != 4) {
+                        throw new IllegalArgumentException(
+                                "Incorrect key [" + aliasFrom + "] in alias:script.");
+                    }
+                    script.put(aliasFrom, aliasTo);
                 }
-            script.put(aliasFrom, aliasTo);
-            }
-            for (int i = 0; i < territoryAlias.getSize(); i++) {
-                UResourceBundle res = territoryAlias.get(i);
-                String aliasFrom = res.getKey();
-                String aliasTo = res.get("replacement").getString();
-                if (aliasFrom.length() < 2 || aliasFrom.length() > 3) {
-                    throw new IllegalArgumentException(
-                            "Incorrect key [" + aliasFrom + "] in alias:territory.");
+                for (int i = 0; i < territoryAlias.getSize(); i++) {
+                    UResourceBundle res = territoryAlias.get(i);
+                    String aliasFrom = res.getKey();
+                    String aliasTo = res.get("replacement").getString();
+                    if (aliasFrom.length() < 2 || aliasFrom.length() > 3) {
+                        throw new IllegalArgumentException(
+                                "Incorrect key [" + aliasFrom + "] in alias:territory.");
+                    }
+                    territory.put(aliasFrom, new ArrayList<>(Arrays.asList(aliasTo.split(" "))));
                 }
-            territory.put(
-                    aliasFrom, new ArrayList<>(Arrays.asList(aliasTo.split(" "))));
-            }
-            for (int i = 0; i < variantAlias.getSize(); i++) {
-                UResourceBundle res = variantAlias.get(i);
-                String aliasFrom = res.getKey();
-                String aliasTo = res.get("replacement").getString();
-                if (aliasFrom.length() < 4
-                        || aliasFrom.length() > 8
-                        || (aliasFrom.length() == 4
-                                && (aliasFrom.charAt(0) < '0' || aliasFrom.charAt(0) > '9'))) {
-                    throw new IllegalArgumentException(
-                            "Incorrect key [" + aliasFrom + "] in alias:variant.");
+                for (int i = 0; i < variantAlias.getSize(); i++) {
+                    UResourceBundle res = variantAlias.get(i);
+                    String aliasFrom = res.getKey();
+                    String aliasTo = res.get("replacement").getString();
+                    if (aliasFrom.length() < 4
+                            || aliasFrom.length() > 8
+                            || (aliasFrom.length() == 4
+                                    && (aliasFrom.charAt(0) < '0' || aliasFrom.charAt(0) > '9'))) {
+                        throw new IllegalArgumentException(
+                                "Incorrect key [" + aliasFrom + "] in alias:variant.");
+                    }
+                    if (aliasTo.length() < 4
+                            || aliasTo.length() > 8
+                            || (aliasTo.length() == 4
+                                    && (aliasTo.charAt(0) < '0' || aliasTo.charAt(0) > '9'))) {
+                        throw new IllegalArgumentException(
+                                "Incorrect variant ["
+                                        + aliasTo
+                                        + "] for the key ["
+                                        + aliasFrom
+                                        + "] in alias:variant.");
+                    }
+                    variant.put(aliasFrom, aliasTo);
                 }
-                if (aliasTo.length() < 4
-                        || aliasTo.length() > 8
-                        || (aliasTo.length() == 4
-                                && (aliasTo.charAt(0) < '0' || aliasTo.charAt(0) > '9'))) {
-                    throw new IllegalArgumentException(
-                            "Incorrect variant ["
-                                    + aliasTo
-                                    + "] for the key ["
-                                    + aliasFrom
-                                    + "] in alias:variant.");
+                for (int i = 0; i < subdivisionAlias.getSize(); i++) {
+                    UResourceBundle res = subdivisionAlias.get(i);
+                    String aliasFrom = res.getKey();
+                    String aliasTo = res.get("replacement").getString().split(" ")[0];
+                    if (aliasFrom.length() < 3 || aliasFrom.length() > 8) {
+                        throw new IllegalArgumentException(
+                                "Incorrect key [" + aliasFrom + "] in alias:territory.");
+                    }
+                    if (aliasTo.length() == 2) {
+                        // Add 'zzzz' based on changes to UTS #35 for CLDR-14312.
+                        aliasTo += "zzzz";
+                    } else if (aliasTo.length() < 2 || aliasTo.length() > 8) {
+                        throw new IllegalArgumentException(
+                                "Incorrect value [" + aliasTo + "] in alias:territory.");
+                    }
+                    subdivision.put(aliasFrom, aliasTo);
                 }
-            variant.put(aliasFrom, aliasTo);
-            }
-            for (int i = 0; i < subdivisionAlias.getSize(); i++) {
-                UResourceBundle res = subdivisionAlias.get(i);
-                String aliasFrom = res.getKey();
-                String aliasTo = res.get("replacement").getString().split(" ")[0];
-                if (aliasFrom.length() < 3 || aliasFrom.length() > 8) {
-                    throw new IllegalArgumentException(
-                            "Incorrect key [" + aliasFrom + "] in alias:territory.");
-                }
-                if (aliasTo.length() == 2) {
-                    // Add 'zzzz' based on changes to UTS #35 for CLDR-14312.
-                    aliasTo += "zzzz";
-                } else if (aliasTo.length() < 2 || aliasTo.length() > 8) {
-                    throw new IllegalArgumentException(
-                            "Incorrect value [" + aliasTo + "] in alias:territory.");
-                }
-            subdivision.put(aliasFrom, aliasTo);
-            }
 
-            languageAliasMap = Map.copyOf(language);
-            scriptAliasMap = Map.copyOf(script);
-            territoryAliasMap = Map.copyOf(territory);
-            variantAliasMap = Map.copyOf(variant);
-            subdivisionAliasMap = Map.copyOf(subdivision);
+                languageAliasMap = Map.copyOf(language);
+                scriptAliasMap = Map.copyOf(script);
+                territoryAliasMap = Map.copyOf(territory);
+                variantAliasMap = Map.copyOf(variant);
+                subdivisionAliasMap = Map.copyOf(subdivision);
             }
         }
 
