@@ -1003,53 +1003,53 @@ public class MeasureUnit implements Serializable {
             return;
         }
         synchronized (MEASURE_UNIT_LOCK) {
-        if (cacheIsPopulated) {
-            return;
-        }
-        // Guard against re-entrant calls during loading:
-        // populateCache() -> getBundleInstance() -> addUnit() -> populateCache().
-        // cacheIsLoading is only accessed under MEASURE_UNIT_LOCK so it doesn't need volatile.
-        // The volatile cacheIsPopulated flag is set AFTER loading completes, ensuring
-        // concurrent readers never see a partially-populated cache.
-        if (cacheIsLoading) {
-            return;
-        }
-        cacheIsLoading = true;
-        try {
-        /*  Schema:
-         *
-         *  units{
-         *    duration{
-         *      day{
-         *        one{"{0} ден"}
-         *        other{"{0} дена"}
-         *      }
-         */
+            if (cacheIsPopulated) {
+                return;
+            }
+            // Guard against re-entrant calls during loading:
+            // populateCache() -> getBundleInstance() -> addUnit() -> populateCache().
+            // cacheIsLoading is only accessed under MEASURE_UNIT_LOCK so it doesn't need volatile.
+            // The volatile cacheIsPopulated flag is set AFTER loading completes, ensuring
+            // concurrent readers never see a partially-populated cache.
+            if (cacheIsLoading) {
+                return;
+            }
+            cacheIsLoading = true;
+            try {
+                /*  Schema:
+                 *
+                 *  units{
+                 *    duration{
+                 *      day{
+                 *        one{"{0} ден"}
+                 *        other{"{0} дена"}
+                 *      }
+                 */
 
-        // Load the unit types.  Use English, since we know that that is a superset.
-        ICUResourceBundle rb1 =
-                (ICUResourceBundle)
-                        UResourceBundle.getBundleInstance(ICUData.ICU_UNIT_BASE_NAME, "en");
-        rb1.getAllItemsWithFallback("units", new MeasureUnitSink());
+                // Load the unit types.  Use English, since we know that that is a superset.
+                ICUResourceBundle rb1 =
+                        (ICUResourceBundle)
+                                UResourceBundle.getBundleInstance(ICUData.ICU_UNIT_BASE_NAME, "en");
+                rb1.getAllItemsWithFallback("units", new MeasureUnitSink());
 
-        // Load the currencies
-        ICUResourceBundle rb2 =
-                (ICUResourceBundle)
-                        UResourceBundle.getBundleInstance(
-                                ICUData.ICU_BASE_NAME,
-                                "currencyNumericCodes",
-                                ICUResourceBundle.ICU_DATA_CLASS_LOADER);
-        rb2.getAllItemsWithFallback("codeMap", new CurrencyNumericCodeSink());
+                // Load the currencies
+                ICUResourceBundle rb2 =
+                        (ICUResourceBundle)
+                                UResourceBundle.getBundleInstance(
+                                        ICUData.ICU_BASE_NAME,
+                                        "currencyNumericCodes",
+                                        ICUResourceBundle.ICU_DATA_CLASS_LOADER);
+                rb2.getAllItemsWithFallback("codeMap", new CurrencyNumericCodeSink());
 
-        // Volatile write AFTER loading completes: ensures concurrent readers
-        // (who skip the synchronized block via the fast path)
-        // never see a partially-populated cache.
-        cacheIsPopulated = true;
-        } finally {
-        // Reset on failure so the next call can retry instead of permanently wedging.
-        // On success, cacheIsPopulated is already true so cacheIsLoading is irrelevant.
-        cacheIsLoading = false;
-        }
+                // Volatile write AFTER loading completes: ensures concurrent readers
+                // (who skip the synchronized block via the fast path)
+                // never see a partially-populated cache.
+                cacheIsPopulated = true;
+            } finally {
+                // Reset on failure so the next call can retry instead of permanently wedging.
+                // On success, cacheIsPopulated is already true so cacheIsLoading is irrelevant.
+                cacheIsLoading = false;
+            }
         }
     }
 
