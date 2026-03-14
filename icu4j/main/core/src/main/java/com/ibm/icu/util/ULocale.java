@@ -1366,7 +1366,6 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
 
         public String replace() {
             boolean changed = false;
-            loadAliasData();
             int count = 0;
             while (true) {
                 if (count++ > 10) {
@@ -1443,30 +1442,29 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
         }
         ;
 
-        private static boolean aliasDataIsLoaded = false;
-        private static Map<String, String> languageAliasMap = null;
-        private static Map<String, String> scriptAliasMap = null;
-        private static Map<String, List<String>> territoryAliasMap = null;
-        private static Map<String, String> variantAliasMap = null;
-        private static Map<String, String> subdivisionAliasMap = null;
-
-        /*
-         * Initializes the alias data from the ICU resource bundles. The alias
-         * data contains alias of language, country, script and variants.
+        /**
+         * Holds all alias replacement maps, loaded once from ICU resource bundles. Uses the Holder
+         * class idiom (JLS 12.4.2) for thread-safe lazy initialization without synchronization on
+         * the read path.
          *
-         * If the alias data has already loaded, then this method simply
-         * returns without doing anything meaningful.
-         *
+         * <p>Note: If the ICU "metadata" resource bundle is missing or corrupt, class
+         * initialization fails permanently (ExceptionInInitializerError). This is acceptable
+         * because alias data is shipped inside the ICU4J JAR and is not subject to transient
+         * failures.
          */
-        private static synchronized void loadAliasData() {
-            if (aliasDataIsLoaded) {
-                return;
-            }
-            languageAliasMap = new HashMap<>();
-            scriptAliasMap = new HashMap<>();
-            territoryAliasMap = new HashMap<>();
-            variantAliasMap = new HashMap<>();
-            subdivisionAliasMap = new HashMap<>();
+        private static final class AliasDataHolder {
+            static final Map<String, String> languageAliasMap;
+            static final Map<String, String> scriptAliasMap;
+            static final Map<String, List<String>> territoryAliasMap;
+            static final Map<String, String> variantAliasMap;
+            static final Map<String, String> subdivisionAliasMap;
+
+            static {
+            Map<String, String> language = new HashMap<>();
+            Map<String, String> script = new HashMap<>();
+            Map<String, List<String>> territory = new HashMap<>();
+            Map<String, String> variant = new HashMap<>();
+            Map<String, String> subdivision = new HashMap<>();
 
             UResourceBundle metadata =
                     UResourceBundle.getBundleInstance(
@@ -1494,7 +1492,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                                     + aliasFrom
                                     + "] in alias:language contains unsupported fields combination.");
                 }
-                languageAliasMap.put(aliasFrom, aliasTo);
+            language.put(aliasFrom, aliasTo);
             }
             for (int i = 0; i < scriptAlias.getSize(); i++) {
                 UResourceBundle res = scriptAlias.get(i);
@@ -1504,7 +1502,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                     throw new IllegalArgumentException(
                             "Incorrect key [" + aliasFrom + "] in alias:script.");
                 }
-                scriptAliasMap.put(aliasFrom, aliasTo);
+            script.put(aliasFrom, aliasTo);
             }
             for (int i = 0; i < territoryAlias.getSize(); i++) {
                 UResourceBundle res = territoryAlias.get(i);
@@ -1514,8 +1512,8 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                     throw new IllegalArgumentException(
                             "Incorrect key [" + aliasFrom + "] in alias:territory.");
                 }
-                territoryAliasMap.put(
-                        aliasFrom, new ArrayList<>(Arrays.asList(aliasTo.split(" "))));
+            territory.put(
+                    aliasFrom, new ArrayList<>(Arrays.asList(aliasTo.split(" "))));
             }
             for (int i = 0; i < variantAlias.getSize(); i++) {
                 UResourceBundle res = variantAlias.get(i);
@@ -1539,7 +1537,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                                     + aliasFrom
                                     + "] in alias:variant.");
                 }
-                variantAliasMap.put(aliasFrom, aliasTo);
+            variant.put(aliasFrom, aliasTo);
             }
             for (int i = 0; i < subdivisionAlias.getSize(); i++) {
                 UResourceBundle res = subdivisionAlias.get(i);
@@ -1556,10 +1554,35 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                     throw new IllegalArgumentException(
                             "Incorrect value [" + aliasTo + "] in alias:territory.");
                 }
-                subdivisionAliasMap.put(aliasFrom, aliasTo);
+            subdivision.put(aliasFrom, aliasTo);
             }
 
-            aliasDataIsLoaded = true;
+            languageAliasMap = Map.copyOf(language);
+            scriptAliasMap = Map.copyOf(script);
+            territoryAliasMap = Map.copyOf(territory);
+            variantAliasMap = Map.copyOf(variant);
+            subdivisionAliasMap = Map.copyOf(subdivision);
+            }
+        }
+
+        private static Map<String, String> languageAliasMap() {
+            return AliasDataHolder.languageAliasMap;
+        }
+
+        private static Map<String, String> scriptAliasMap() {
+            return AliasDataHolder.scriptAliasMap;
+        }
+
+        private static Map<String, List<String>> territoryAliasMap() {
+            return AliasDataHolder.territoryAliasMap;
+        }
+
+        private static Map<String, String> variantAliasMap() {
+            return AliasDataHolder.variantAliasMap;
+        }
+
+        private static Map<String, String> subdivisionAliasMap() {
+            return AliasDataHolder.subdivisionAliasMap;
         }
 
         private static String generateKey(String language, String region, String variant) {
@@ -1612,7 +1635,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
                     searchVariant = null;
                 }
                 String typeKey = generateKey(searchLanguage, searchRegion, searchVariant);
-                String replacement = languageAliasMap.get(typeKey);
+                String replacement = languageAliasMap().get(typeKey);
                 if (replacement == null) {
                     // Found no replacement data.
                     continue;
@@ -1708,7 +1731,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
 
         private boolean replaceRegion() {
             if (region == null || region.isEmpty()) return false;
-            List<String> replacement = territoryAliasMap.get(region);
+            List<String> replacement = territoryAliasMap().get(region);
             if (replacement == null) {
                 // Found no replacement data for this region.
                 return false;
@@ -1733,7 +1756,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
 
         private boolean replaceScript() {
             if (script == null || script.isEmpty()) return false;
-            String replacement = scriptAliasMap.get(script);
+            String replacement = scriptAliasMap().get(script);
             if (replacement == null) {
                 // Found no replacement data for this script.
                 return false;
@@ -1748,7 +1771,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
             if (variants == null) return false;
             for (int i = 0; i < variants.size(); i++) {
                 String variant = variants.get(i);
-                String replacement = variantAliasMap.get(variant);
+                String replacement = variantAliasMap().get(variant);
                 if (replacement == null) {
                     // Found no replacement data for this variant.
                     continue;
@@ -1773,7 +1796,7 @@ public final class ULocale implements Serializable, Comparable<ULocale>, Cloneab
         }
 
         private String replaceSubdivision(String subdivision) {
-            return subdivisionAliasMap.get(subdivision);
+            return subdivisionAliasMap().get(subdivision);
         }
 
         private String replaceTransformedExtensions(String extensions) {
