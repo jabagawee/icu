@@ -234,11 +234,8 @@ public class Region implements Comparable<Region> {
             for (String id : regionCodes) {
                 Region r = new Region();
                 r.id = id;
-                r.type =
-                        RegionType
-                                .TERRITORY; // Only temporary - figure out the real type later once
-                // the
-                // aliases are known.
+                // Only temporary - figure out the real type later once the aliases are known.
+                r.type = RegionType.TERRITORY;
                 regionIDMap.put(id, r);
                 if (id.matches("[0-9]{3}")) {
                     r.code = Integer.valueOf(id).intValue();
@@ -264,9 +261,9 @@ public class Region implements Comparable<Region> {
                     Region r;
                     if (regionIDMap.containsKey(aliasFrom)) { // This is a deprecated region
                         r = regionIDMap.get(aliasFrom);
-                    } else { // Deprecated region code not in the primary codes list - so need to
-                        // create
-                        // a deprecated region for it.
+                    } else {
+                        // Deprecated region code not in the primary codes list -
+                        // so need to create a deprecated region for it.
                         r = new Region();
                         r.id = aliasFrom;
                         regionIDMap.put(aliasFrom, r);
@@ -351,11 +348,11 @@ public class Region implements Comparable<Region> {
                 if (parent.equals("containedGroupings")
                         || parent.equals("deprecated")
                         || parent.equals("grouping")) {
-                    continue; // handle new pseudo-parent types added in ICU data per cldrbug 7808;
-                    // for
-                    // now just skip.
+                    // Handle new pseudo-parent types added in ICU data per cldrbug 7808;
+                    // for now just skip.
                     // #11232 is to do something useful with these.
                     // Also skip "grouping" which has multi-level structure below from CLDR 34.
+                    continue;
                 }
                 Region parentRegion = regionIDMap.get(parent);
                 for (int j = 0; j < mapping.getSize(); j++) {
