@@ -24,12 +24,14 @@ import java.util.List;
  * @stable ICU 3.6
  */
 public final class CharsetProviderICU extends CharsetProvider {
+    private static volatile boolean icuCharsetsLoaded = false;
+
     /**
      * List of available ICU Charsets, empty during static initialization. Not a Set or Map, so that
      * we can add different Charset objects with the same name(), which means that they are
      * .equals(). See ICU ticket #11493.
      */
-    private static List<Charset> icuCharsets = Collections.<Charset>emptyList();
+    private static volatile List<Charset> icuCharsets = Collections.<Charset>emptyList();
 
     /**
      * Default constructor
@@ -268,8 +270,12 @@ public final class CharsetProviderICU extends CharsetProvider {
      * Lazy-init the icuCharsets list. Could be done during static initialization if constructing
      * all of the Charsets were cheap enough. See ICU ticket #11481.
      */
-    private static final synchronized void loadAvailableICUCharsets() {
-        if (!icuCharsets.isEmpty()) {
+    private static void loadAvailableICUCharsets() {
+        if (icuCharsetsLoaded) {
+            return;
+        }
+        synchronized (CharsetProviderICU.class) {
+        if (icuCharsetsLoaded) {
             return;
         }
         List<Charset> icucs = new LinkedList<Charset>();
@@ -286,6 +292,8 @@ public final class CharsetProviderICU extends CharsetProvider {
         }
         // Unmodifiable so that charsets().next().remove() cannot change it.
         icuCharsets = Collections.unmodifiableList(icucs);
+        icuCharsetsLoaded = true; // volatile write; safe even if icuCharsets is empty
+        }
     }
 
     /**

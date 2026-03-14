@@ -120,7 +120,7 @@ public class Region implements Comparable<Region> {
     private Set<Region> containedRegions = new TreeSet<Region>();
     private List<Region> preferredValues = null;
 
-    private static boolean regionDataIsLoaded = false;
+    private static volatile boolean regionDataIsLoaded = false;
 
     private static Map<String, Region> regionIDMap = null; // Map from ID the regions
     private static Map<Integer, Region> numericCodeMap =
@@ -149,8 +149,11 @@ public class Region implements Comparable<Region> {
      * anything meaningful.
      *
      */
-    private static synchronized void loadRegionData() {
-
+    private static void loadRegionData() {
+        if (regionDataIsLoaded) {
+            return;
+        }
+        synchronized (Region.class) {
         if (regionDataIsLoaded) {
             return;
         }
@@ -398,6 +401,7 @@ public class Region implements Comparable<Region> {
         }
 
         regionDataIsLoaded = true;
+        }
     }
 
     /**
