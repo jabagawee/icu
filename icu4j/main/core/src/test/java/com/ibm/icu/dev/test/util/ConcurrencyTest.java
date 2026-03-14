@@ -30,8 +30,11 @@ public abstract class ConcurrencyTest extends CoreTestFmwk {
 
     protected void runConcurrent(String testName, ConcurrentTask task) throws Exception {
         Assume.assumeTrue(
-                "Concurrency tests require exhaustiveness >= " + MIN_EXHAUSTIVENESS
-                        + " (use -e " + MIN_EXHAUSTIVENESS + ")",
+                "Concurrency tests require exhaustiveness >= "
+                        + MIN_EXHAUSTIVENESS
+                        + " (use -e "
+                        + MIN_EXHAUSTIVENESS
+                        + ")",
                 getExhaustiveness() >= MIN_EXHAUSTIVENESS);
 
         final CyclicBarrier barrier = new CyclicBarrier(THREAD_COUNT);
@@ -65,21 +68,23 @@ public abstract class ConcurrencyTest extends CoreTestFmwk {
             }
         }
         if (!hung.isEmpty()) {
-            fail(testName
-                    + ": threads still alive after "
-                    + TIMEOUT_MS
-                    + "ms (possible deadlock): "
-                    + String.join(", ", hung));
+            fail(
+                    testName
+                            + ": threads still alive after "
+                            + TIMEOUT_MS
+                            + "ms (possible deadlock): "
+                            + String.join(", ", hung));
         }
         if (!errors.isEmpty()) {
             Throwable first = errors.get(0);
-            fail(testName
-                    + ": "
-                    + errors.size()
-                    + " thread(s) threw exceptions. First: "
-                    + first.getClass().getName()
-                    + ": "
-                    + first.getMessage());
+            fail(
+                    testName
+                            + ": "
+                            + errors.size()
+                            + " thread(s) threw exceptions. First: "
+                            + first.getClass().getName()
+                            + ": "
+                            + first.getMessage());
         }
     }
 }

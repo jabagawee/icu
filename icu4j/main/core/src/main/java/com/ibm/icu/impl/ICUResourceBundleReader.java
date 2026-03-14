@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -1170,12 +1169,11 @@ public final class ICUResourceBundleReader {
      *
      * <p>Large resource objects are usually stored in SoftReferences.
      *
-     * <p>This replaces the previous custom trie structure (ICU-10932, 2014) with
-     * ConcurrentHashMap for lock-free concurrent reads. Benchmarking shows CHM uses
-     * ~3x less memory than the trie at typical ICU bundle sizes (~221 entries/cache)
-     * due to the trie's sparse power-of-2 Level arrays (5% utilization), while
-     * providing ~2x better throughput at 32 threads by eliminating the synchronized
-     * bottleneck on every resource lookup.
+     * <p>This replaces the previous custom trie structure (ICU-10932, 2014) with ConcurrentHashMap
+     * for lock-free concurrent reads. Benchmarking shows CHM uses ~3x less memory than the trie at
+     * typical ICU bundle sizes (~221 entries/cache) due to the trie's sparse power-of-2 Level
+     * arrays (5% utilization), while providing ~2x better throughput at 32 threads by eliminating
+     * the synchronized bottleneck on every resource lookup.
      */
     private static final class ResourceCache {
         private final ConcurrentHashMap<Integer, Object> map;
@@ -1213,18 +1211,20 @@ public final class ICUResourceBundleReader {
             // Use compute() for both paths to atomically handle cleared SoftReferences.
             // putIfAbsent() cannot replace a cleared SoftReference (non-null but dead),
             // which would return null to the caller.
-            Object[] result = new Object[] { item };
-            map.compute(res, (key, existing) -> {
-                if (existing != null) {
-                    Object val = unwrapSoftReference(existing);
-                    if (val != null) {
-                        result[0] = val;
-                        return existing;
-                    }
-                }
-                result[0] = item;
-                return storeDirectly(size) ? item : new SoftReference<>(item);
-            });
+            Object[] result = new Object[] {item};
+            map.compute(
+                    res,
+                    (key, existing) -> {
+                        if (existing != null) {
+                            Object val = unwrapSoftReference(existing);
+                            if (val != null) {
+                                result[0] = val;
+                                return existing;
+                            }
+                        }
+                        result[0] = item;
+                        return storeDirectly(size) ? item : new SoftReference<>(item);
+                    });
             return result[0];
         }
 

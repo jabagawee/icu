@@ -18,23 +18,26 @@ public class ResourceCacheConcurrencyTest extends ConcurrencyTest {
         String[] localeNames = {"en", "de", "ja", "zh", "fr", "es", "ko", "pt"};
 
         for (String loc : localeNames) {
-            UResourceBundle rb = UResourceBundle.getBundleInstance(
-                    ICUData.ICU_BASE_NAME, new ULocale(loc));
+            UResourceBundle rb =
+                    UResourceBundle.getBundleInstance(ICUData.ICU_BASE_NAME, new ULocale(loc));
             if (rb == null) return;
         }
 
-        runConcurrent("ResourceCacheLookups", tid -> {
-            for (int i = 0; i < ITERATIONS; i++) {
-                String loc = localeNames[(tid + i) % localeNames.length];
-                UResourceBundle rb = UResourceBundle.getBundleInstance(
-                        ICUData.ICU_BASE_NAME, new ULocale(loc));
-                assertNotNull("ResourceBundle should not be null", rb);
-                try {
-                    rb.get("Version");
-                } catch (Exception e) {
-                    // Some bundles may not have this key
-                }
-            }
-        });
+        runConcurrent(
+                "ResourceCacheLookups",
+                tid -> {
+                    for (int i = 0; i < ITERATIONS; i++) {
+                        String loc = localeNames[(tid + i) % localeNames.length];
+                        UResourceBundle rb =
+                                UResourceBundle.getBundleInstance(
+                                        ICUData.ICU_BASE_NAME, new ULocale(loc));
+                        assertNotNull("ResourceBundle should not be null", rb);
+                        try {
+                            rb.get("Version");
+                        } catch (Exception e) {
+                            // Some bundles may not have this key
+                        }
+                    }
+                });
     }
 }
