@@ -97,7 +97,7 @@ class CaseFoldTransliterator extends Transliterator {
         offsets.start = offsets.limit;
     }
 
-    static SourceTargetUtility sourceTargetUtility = null;
+    static volatile SourceTargetUtility sourceTargetUtility = null;
 
     /* (non-Javadoc)
      * @see com.ibm.icu.text.Transliterator#addSourceTargetSet(com.ibm.icu.text.UnicodeSet, com.ibm.icu.text.UnicodeSet, com.ibm.icu.text.UnicodeSet)
@@ -105,7 +105,8 @@ class CaseFoldTransliterator extends Transliterator {
     @Override
     public void addSourceTargetSet(
             UnicodeSet inputFilter, UnicodeSet sourceSet, UnicodeSet targetSet) {
-        synchronized (UppercaseTransliterator.class) {
+        if (sourceTargetUtility == null) {
+        synchronized (CaseFoldTransliterator.class) {
             if (sourceTargetUtility == null) {
                 sourceTargetUtility =
                         new SourceTargetUtility(
@@ -115,6 +116,7 @@ class CaseFoldTransliterator extends Transliterator {
                                         return UCharacter.foldCase(source, true);
                                     }
                                 });
+            }
             }
         }
         sourceTargetUtility.addSourceTargetSet(this, inputFilter, sourceSet, targetSet);
