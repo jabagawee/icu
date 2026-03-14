@@ -41,11 +41,12 @@ public class CorrectnessFixConcurrencyTest extends ConcurrencyTest {
     /** formatImpl() else-branch must synchronize on numberFormat. */
     @Test
     public void testRelativeDateTimeFormatterConcurrent() throws Exception {
+        // Share a single instance across threads to exercise the synchronized(numberFormat) fix.
+        RelativeDateTimeFormatter fmt =
+                RelativeDateTimeFormatter.getInstance(ULocale.ENGLISH);
         runConcurrent(
                 "RelativeDateTimeFormatter",
                 tid -> {
-                    RelativeDateTimeFormatter fmt =
-                            RelativeDateTimeFormatter.getInstance(ULocale.ENGLISH);
                     for (int i = 0; i < ITERATIONS; i++) {
                         String result =
                                 fmt.format(

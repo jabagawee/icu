@@ -2,6 +2,7 @@
 // License & terms of use: http://www.unicode.org/copyright.html
 package com.ibm.icu.dev.test.util;
 
+import com.ibm.icu.text.CollationElementIterator;
 import com.ibm.icu.text.Collator;
 import com.ibm.icu.text.RuleBasedCollator;
 import com.ibm.icu.util.ULocale;
@@ -24,11 +25,17 @@ public class CollationConcurrencyTest extends ConcurrencyTest {
                         String localeID = localeIDs[(tid + i) % localeIDs.length];
                         RuleBasedCollator col =
                                 (RuleBasedCollator) Collator.getInstance(new ULocale(localeID));
+                        assertNotNull("Collator should not be null for " + localeID, col);
                         // getCollationElementIterator triggers initMaxExpansions()
                         // which reads/writes the volatile maxExpansions field
-                        assertNotNull("Collator should not be null for " + localeID, col);
-                        int result = col.compare("abc", "def");
-                        assertTrue("compare should return non-zero", result != 0);
+                        CollationElementIterator cei =
+                                col.getCollationElementIterator("test string");
+                        int ce = cei.next();
+                        assertTrue(
+                                "should produce at least one collation element",
+                                ce != CollationElementIterator.NULLORDER);
+                        int maxExp = cei.getMaxExpansion(ce);
+                        assertTrue("max expansion should be positive", maxExp > 0);
                     }
                 });
     }

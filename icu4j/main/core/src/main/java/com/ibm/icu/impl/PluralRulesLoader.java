@@ -26,15 +26,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Loader for plural rules data. */
 public class PluralRulesLoader extends PluralRules.Factory {
-    // Key is rules set + ranges set. Uses PluralRules.DEFAULT as sentinel for "parsed but null".
+    // Key is rules set + ranges set.
     private final ConcurrentHashMap<String, PluralRules> pluralRulesCache;
     // lazy init, use getLocaleIdToRulesIdMap to access
     private volatile Map<String, String> localeIdToCardinalRulesId;
     private volatile Map<String, String> localeIdToOrdinalRulesId;
     private volatile Map<String, ULocale> rulesIdToEquivalentULocale;
 
-    // Sentinel value for ConcurrentHashMap (which doesn't allow null values)
-    private static final PluralRules NULL_RULES = PluralRules.DEFAULT;
+    // Dedicated sentinel for ConcurrentHashMap (which doesn't allow null values).
+    // Must not be PluralRules.DEFAULT, which newInternal() can return for empty descriptions.
+    private static final PluralRules NULL_RULES = PluralRules.createRules("other: ");
 
     /** Access through singleton. */
     private PluralRulesLoader() {
