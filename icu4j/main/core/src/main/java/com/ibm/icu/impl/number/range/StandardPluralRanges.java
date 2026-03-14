@@ -55,6 +55,9 @@ public class StandardPluralRanges {
     private static Map<String, String> getLanguageToSet() {
         Map<String, String> candidate = languageToSet;
         if (candidate == null) {
+            synchronized (StandardPluralRanges.class) {
+            candidate = languageToSet;
+            if (candidate == null) {
             Map<String, String> map = new HashMap<String, String>();
             PluralRangeSetsDataSink sink = new PluralRangeSetsDataSink(map);
             ICUResourceBundle resource =
@@ -63,10 +66,9 @@ public class StandardPluralRanges {
                                     ICUData.ICU_BASE_NAME, "pluralRanges");
             resource.getAllItemsWithFallback("locales", sink);
             candidate = Collections.unmodifiableMap(map);
-        }
-        // Check if another thread set languageToSet in the mean time
-        if (languageToSet == null) {
             languageToSet = candidate;
+            }
+            }
         }
         return languageToSet;
     }
