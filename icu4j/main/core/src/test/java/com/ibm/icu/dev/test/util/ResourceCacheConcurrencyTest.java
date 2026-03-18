@@ -20,7 +20,9 @@ public class ResourceCacheConcurrencyTest extends ConcurrencyTest {
         for (String loc : localeNames) {
             UResourceBundle rb =
                     UResourceBundle.getBundleInstance(ICUData.ICU_BASE_NAME, new ULocale(loc));
-            if (rb == null) return;
+            if (rb == null) {
+                return;
+            }
         }
 
         runConcurrent(

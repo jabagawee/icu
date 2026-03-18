@@ -323,7 +323,7 @@ public final class ICUResourceBundleReader {
         }
 
         if (!isPoolBundle || b16BitUnits.length() > 1) {
-            resourceCache = new ResourceCache(maxOffset);
+            resourceCache = new ResourceCache();
         }
 
         // Reset the position for future .asCharBuffer() etc.
@@ -1182,15 +1182,16 @@ public final class ICUResourceBundleReader {
             return size < LARGE_SIZE || CacheValue.futureInstancesWillBeStrong();
         }
 
-        ResourceCache(int maxOffset) {
-            assert maxOffset != 0;
+        ResourceCache() {
             map = new ConcurrentHashMap<>();
         }
 
         @SuppressWarnings("unchecked")
         Object get(int res) {
+            // Integers and empty resources need not be cached.
             assert RES_GET_OFFSET(res) != 0;
-            Object value = map.get(res);
+            Integer resKey = res;
+            Object value = map.get(resKey);
             if (value == null) {
                 return null;
             }
@@ -1199,7 +1200,7 @@ public final class ICUResourceBundleReader {
                 if (referent == null) {
                     // SoftReference was cleared by GC. Remove the dead entry to prevent
                     // unbounded accumulation. Two-arg remove avoids ABA race.
-                    map.remove(res, value);
+                    map.remove(resKey, value);
                 }
                 return referent;
             }
@@ -1211,12 +1212,16 @@ public final class ICUResourceBundleReader {
             // Use compute() for both paths to atomically handle cleared SoftReferences.
             // putIfAbsent() cannot replace a cleared SoftReference (non-null but dead),
             // which would return null to the caller.
+            Integer resKey = res;
             Object[] result = new Object[] {item};
             map.compute(
-                    res,
+                    resKey,
                     (key, existing) -> {
                         if (existing != null) {
-                            Object val = unwrapSoftReference(existing);
+                            Object val =
+                                    existing instanceof SoftReference
+                                            ? ((SoftReference<Object>) existing).get()
+                                            : existing;
                             if (val != null) {
                                 result[0] = val;
                                 return existing;
@@ -1226,14 +1231,6 @@ public final class ICUResourceBundleReader {
                         return storeDirectly(size) ? item : new SoftReference<>(item);
                     });
             return result[0];
-        }
-
-        @SuppressWarnings("unchecked")
-        private static Object unwrapSoftReference(Object value) {
-            if (value instanceof SoftReference) {
-                return ((SoftReference<Object>) value).get();
-            }
-            return value;
         }
     }
 
