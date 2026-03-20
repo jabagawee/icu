@@ -957,16 +957,16 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
 
         if (tmpDefaultZone == null) {
             synchronized (defaultZoneLock) {
-                    tmpDefaultZone = defaultZone;
-                    if (tmpDefaultZone == null) {
-                        if (TZ_IMPL == TIMEZONE_JDK) {
-                            tmpDefaultZone = new JavaTimeZone();
-                        } else {
-                            java.util.TimeZone temp = java.util.TimeZone.getDefault();
-                            tmpDefaultZone = getFrozenTimeZone(temp.getID());
-                        }
-                        defaultZone = tmpDefaultZone;
+                tmpDefaultZone = defaultZone;
+                if (tmpDefaultZone == null) {
+                    if (TZ_IMPL == TIMEZONE_JDK) {
+                        tmpDefaultZone = new JavaTimeZone();
+                    } else {
+                        java.util.TimeZone temp = java.util.TimeZone.getDefault();
+                        tmpDefaultZone = getFrozenTimeZone(temp.getID());
                     }
+                    defaultZone = tmpDefaultZone;
+                }
             }
         }
 
@@ -984,45 +984,45 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
      */
     public static void setDefault(TimeZone tz) {
         synchronized (defaultZoneLock) {
-        // Set default ICU time zone, used by #getDefault()
-        setICUDefault(tz);
+            // Set default ICU time zone, used by #getDefault()
+            setICUDefault(tz);
 
-        if (tz != null) {
-            // Keep java.util.TimeZone default in sync so java.util.Date
-            // can interoperate with com.ibm.icu.util classes.
-            java.util.TimeZone jdkZone = null;
-            if (tz instanceof JavaTimeZone) {
-                jdkZone = ((JavaTimeZone) tz).unwrap();
-            } else if (tz instanceof com.ibm.icu.impl.OlsonTimeZone) {
-                // Because of the lack of APIs supporting historic
-                // zone offset/dst saving in JDK TimeZone,
-                // wrapping ICU TimeZone with JDK TimeZone will
-                // cause historic offset calculation in Calendar/Date.
-                // JDK calendar implementation calls getRawOffset() and
-                // getDSTSavings() when the instance of JDK TimeZone
-                // is not an instance of JDK internal TimeZone subclass
-                // (sun.util.calendar.ZoneInfo).  Ticket#6459
-                String icuID = tz.getID();
-                jdkZone = java.util.TimeZone.getTimeZone(icuID);
-                if (!icuID.equals(jdkZone.getID())) {
-                    // If the ID was unknown, retry with the canonicalized
-                    // ID instead. This will ensure that JDK 1.1.x
-                    // compatibility IDs supported by ICU (but not
-                    // necessarily supported by the platform) work.
-                    // Ticket#11483
-                    icuID = getCanonicalID(icuID);
+            if (tz != null) {
+                // Keep java.util.TimeZone default in sync so java.util.Date
+                // can interoperate with com.ibm.icu.util classes.
+                java.util.TimeZone jdkZone = null;
+                if (tz instanceof JavaTimeZone) {
+                    jdkZone = ((JavaTimeZone) tz).unwrap();
+                } else if (tz instanceof com.ibm.icu.impl.OlsonTimeZone) {
+                    // Because of the lack of APIs supporting historic
+                    // zone offset/dst saving in JDK TimeZone,
+                    // wrapping ICU TimeZone with JDK TimeZone will
+                    // cause historic offset calculation in Calendar/Date.
+                    // JDK calendar implementation calls getRawOffset() and
+                    // getDSTSavings() when the instance of JDK TimeZone
+                    // is not an instance of JDK internal TimeZone subclass
+                    // (sun.util.calendar.ZoneInfo).  Ticket#6459
+                    String icuID = tz.getID();
                     jdkZone = java.util.TimeZone.getTimeZone(icuID);
                     if (!icuID.equals(jdkZone.getID())) {
-                        // JDK does not know the ID..
-                        jdkZone = null;
+                        // If the ID was unknown, retry with the canonicalized
+                        // ID instead. This will ensure that JDK 1.1.x
+                        // compatibility IDs supported by ICU (but not
+                        // necessarily supported by the platform) work.
+                        // Ticket#11483
+                        icuID = getCanonicalID(icuID);
+                        jdkZone = java.util.TimeZone.getTimeZone(icuID);
+                        if (!icuID.equals(jdkZone.getID())) {
+                            // JDK does not know the ID..
+                            jdkZone = null;
+                        }
                     }
                 }
+                if (jdkZone == null) {
+                    jdkZone = TimeZoneAdapter.wrap(tz);
+                }
+                java.util.TimeZone.setDefault(jdkZone);
             }
-            if (jdkZone == null) {
-                jdkZone = TimeZoneAdapter.wrap(tz);
-            }
-            java.util.TimeZone.setDefault(jdkZone);
-        }
         }
     }
 
@@ -1039,15 +1039,15 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
     @Deprecated
     public static void setICUDefault(TimeZone tz) {
         synchronized (defaultZoneLock) {
-        if (tz == null) {
-            defaultZone = null;
-        } else if (tz.isFrozen()) {
-            // No need to create a defensive copy
-            defaultZone = tz;
-        } else {
-            // Creates a defensive copy and freeze it
-            defaultZone = tz.clone().freeze();
-        }
+            if (tz == null) {
+                defaultZone = null;
+            } else if (tz.isFrozen()) {
+                // No need to create a defensive copy
+                defaultZone = tz;
+            } else {
+                // Creates a defensive copy and freeze it
+                defaultZone = tz.clone().freeze();
+            }
         }
     }
 
