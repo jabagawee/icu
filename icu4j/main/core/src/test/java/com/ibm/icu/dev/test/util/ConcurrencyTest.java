@@ -14,7 +14,8 @@ import org.junit.Assume;
  * them at a barrier, runs the task, and collects errors. Threads that hang past {@link #TIMEOUT_MS}
  * trigger a failure with diagnostic info.
  *
- * <p>Tests are skipped unless exhaustiveness >= 5 (pass {@code -DICU.exhaustive=5} to Maven).
+ * <p>Tests that use {@link #runConcurrent} are skipped unless exhaustiveness >= 5 (pass {@code
+ * -DICU.exhaustive=5} to Maven). Subclasses can also have quick tests that always run.
  */
 public abstract class ConcurrencyTest extends CoreTestFmwk {
 

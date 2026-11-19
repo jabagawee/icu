@@ -28,6 +28,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
 /**
@@ -952,26 +953,31 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
      * @stable ICU 2.0
      */
     public static TimeZone getDefault() {
-        // Copy the reference to the current defaultZone,
-        // so it won't be affected by setDefault().
-        TimeZone tmpDefaultZone = defaultZone;
-
-        if (tmpDefaultZone == null) {
-            synchronized (defaultZoneLock) {
-                tmpDefaultZone = defaultZone;
-                if (tmpDefaultZone == null) {
-                    if (TZ_IMPL == TIMEZONE_JDK) {
-                        tmpDefaultZone = new JavaTimeZone();
-                    } else {
-                        java.util.TimeZone temp = java.util.TimeZone.getDefault();
-                        tmpDefaultZone = getFrozenTimeZone(temp.getID());
-                    }
-                    defaultZone = tmpDefaultZone;
-                }
-            }
+        DefaultState current = defaultZone.get();
+        if (!(current instanceof FrozenDefault)) {
+            // Not set, so fill it in from java.util.TimeZone without holding any lock. See
+            // defaultZone for why. If the default is set or cleared meanwhile, updateAndGet() calls
+            // the function again, so a stale zone can't be cached.
+            current = defaultZone.updateAndGet(TimeZone::refillIfCleared);
         }
+        return ((FrozenDefault) current).zone.cloneAsThawed();
+    }
 
-        return tmpDefaultZone.cloneAsThawed();
+    /** Returns {@code state} if the default is set, or else a new one from lookUpDefault(). */
+    private static DefaultState refillIfCleared(DefaultState state) {
+        return state instanceof FrozenDefault ? state : new FrozenDefault(lookUpDefault());
+    }
+
+    /**
+     * Looks up the default from java.util.TimeZone for getDefault(), which may call this more than
+     * once for one refill.
+     */
+    private static TimeZone lookUpDefault() {
+        if (TZ_IMPL == TIMEZONE_JDK) {
+            return new JavaTimeZone();
+        }
+        java.util.TimeZone temp = java.util.TimeZone.getDefault();
+        return getFrozenTimeZone(temp.getID());
     }
 
     /**
@@ -984,9 +990,9 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
      * @stable ICU 2.0
      */
     public static void setDefault(TimeZone tz) {
-        synchronized (defaultZoneLock) {
+        synchronized (setDefaultLock) {
             // Set default ICU time zone, used by #getDefault()
-            setICUDefault(tz);
+            TimeZone icuDefault = storeICUDefault(tz);
 
             if (tz != null) {
                 // Keep java.util.TimeZone default in sync so java.util.Date
@@ -1023,6 +1029,11 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
                     jdkZone = TimeZoneAdapter.wrap(tz);
                 }
                 java.util.TimeZone.setDefault(jdkZone);
+
+                // If the ICU default no longer holds that zone (say a setICUDefault(null) and a
+                // getDefault() refill that read the old JDK zone), replace it with a new marker so
+                // that the next getDefault() reads the JDK default as it is now.
+                clearICUDefaultUnless(icuDefault);
             }
         }
     }
@@ -1039,17 +1050,35 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
      */
     @Deprecated
     public static void setICUDefault(TimeZone tz) {
-        synchronized (defaultZoneLock) {
-            if (tz == null) {
-                defaultZone = null;
-            } else if (tz.isFrozen()) {
-                // No need to create a defensive copy
-                defaultZone = tz;
-            } else {
-                // Creates a defensive copy and freeze it
-                defaultZone = tz.clone().freeze();
-            }
+        storeICUDefault(tz);
+    }
+
+    /** Implements setICUDefault() and returns the frozen zone it stored, or null for a clear. */
+    private static TimeZone storeICUDefault(TimeZone tz) {
+        if (tz == null) {
+            defaultZone.set(new ClearedDefault());
+            return null;
         }
+        TimeZone frozen;
+        if (tz.isFrozen()) {
+            // No need to create a defensive copy
+            frozen = tz;
+        } else {
+            // Creates a defensive copy and freeze it
+            frozen = tz.clone().freeze();
+        }
+        defaultZone.set(new FrozenDefault(frozen));
+        return frozen;
+    }
+
+    /** Replaces the ICU default with a new marker unless it still holds {@code stored}. */
+    @SuppressWarnings("ReferenceEquality") // stored is the exact zone setDefault() stored
+    private static void clearICUDefaultUnless(TimeZone stored) {
+        defaultZone.updateAndGet(
+                current ->
+                        current instanceof FrozenDefault && ((FrozenDefault) current).zone == stored
+                                ? current
+                                : new ClearedDefault());
     }
 
     /**
@@ -1397,19 +1426,46 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
      */
     private String ID;
 
-    /** The default time zone, or null if not set. */
-    private static volatile TimeZone defaultZone = null;
+    /** What {@link #defaultZone} holds. */
+    private interface DefaultState {}
+
+    /** A frozen ICU default time zone, set or filled in. */
+    private static final class FrozenDefault implements DefaultState {
+        final TimeZone zone;
+
+        FrozenDefault(TimeZone zone) {
+            this.zone = zone;
+        }
+    }
 
     /**
-     * Private lock object for defaultZone access.
-     *
-     * <p>Lock ordering: {@code defaultZoneLock} may be held when calling {@code
-     * java.util.TimeZone.setDefault()}, which internally synchronizes on {@code
-     * java.util.TimeZone.class}. Code that holds {@code java.util.TimeZone.class} must not call
-     * ICU's {@code TimeZone.getDefault()} or {@code setDefault()}. In practice this is safe because
-     * the JDK's TimeZone implementation does not call into ICU.
+     * Not set, so {@link #getDefault()} fills it in from java.util.TimeZone. Every clear installs a
+     * new one, so a refill that raced the clear runs again instead of caching a stale zone.
      */
-    private static final Object defaultZoneLock = new Object();
+    private static final class ClearedDefault implements DefaultState {}
+
+    /**
+     * A {@link FrozenDefault} holding the ICU default time zone, or a {@link ClearedDefault} until
+     * it is set or filled in.
+     *
+     * <p>No lock guards this field. On Android, {@code java.util.TimeZone.setDefault()} calls
+     * {@link #setICUDefault} while holding the {@code java.util.TimeZone.class} monitor, and {@link
+     * #getDefault()} calls into java.util.TimeZone to fill this in. If both took the same ICU lock,
+     * they could deadlock (ICU-23629).
+     */
+    private static final AtomicReference<DefaultState> defaultZone =
+            new AtomicReference<>(new ClearedDefault());
+
+    /**
+     * Serializes {@link #setDefault(TimeZone)} callers, as 79.1's lock did. Without it, one
+     * caller's check after its JDK store could replace another caller's zone with a marker, and
+     * getDefault() would then refill from java.util.TimeZone instead of returning that zone (an
+     * OlsonTimeZone with changed rules would come back as the stock zone). It is held while calling
+     * into java.util.TimeZone, but only setDefault() takes it. In particular setICUDefault(), which
+     * Android's java.util.TimeZone.setDefault() calls while holding {@code
+     * java.util.TimeZone.class}, doesn't, so the JDK's own code never waits for it.
+     */
+    private static final Object setDefaultLock = new Object();
 
     /** TimeZone implementation type */
     private static volatile int TZ_IMPL = TIMEZONE_ICU;
