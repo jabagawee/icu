@@ -977,6 +977,21 @@ public abstract class TimeZone implements Serializable, Cloneable, Freezable<Tim
             return new JavaTimeZone();
         }
         java.util.TimeZone temp = java.util.TimeZone.getDefault();
+        if (temp instanceof TimeZoneAdapter) {
+            // An ICU zone, e.g. from setDefault(). Use it rather than looking up its ID, which
+            // would give Etc/Unknown for an ID ICU doesn't recognize, or a stock zone with
+            // different rules for one it does.
+            TimeZone icu = ((TimeZoneAdapter) temp).unwrap();
+            TimeZone frozen = null;
+            try {
+                frozen = icu.isFrozen() ? icu : icu.clone().freeze();
+            } catch (RuntimeException e) {
+                // A subclass that can't be frozen; fall back to the ID below.
+            }
+            if (frozen != null) {
+                return frozen;
+            }
+        }
         return getFrozenTimeZone(temp.getID());
     }
 

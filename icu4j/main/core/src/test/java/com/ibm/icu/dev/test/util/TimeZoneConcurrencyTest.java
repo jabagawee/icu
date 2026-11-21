@@ -607,6 +607,90 @@ public class TimeZoneConcurrencyTest extends ConcurrencyTest {
         assertNull("ICU and JDK defaults disagree after " + mismatch, mismatch);
     }
 
+    /**
+     * On Android, java.util.TimeZone.setDefault() clears the ICU default right after storing the
+     * JDK default, including when ICU's setDefault() calls it. The next getDefault() must get a
+     * custom zone back from the JDK default rather than looking up its ID, which ICU doesn't know.
+     */
+    @Test
+    public void testClearAfterSetDefaultKeepsCustomZone() {
+        TimeZone originalIcu = TimeZone.getDefault();
+        java.util.TimeZone originalJdk = java.util.TimeZone.getDefault();
+        int offset = 19_234_000;
+        try {
+            TimeZone.setDefault(new SimpleTimeZone(offset, "ICU-23629-Custom"));
+            TimeZone.setICUDefault(null);
+            TimeZone icu = TimeZone.getDefault();
+            assertEquals("ICU default ID", "ICU-23629-Custom", icu.getID());
+            assertEquals("ICU default raw offset", offset, icu.getRawOffset());
+        } finally {
+            java.util.TimeZone.setDefault(originalJdk);
+            TimeZone.setICUDefault(originalIcu);
+        }
+    }
+
+    /**
+     * If the JDK default is a TimeZoneAdapter around an ICU zone that can't be frozen (the base
+     * class freeze() throws), getDefault() must fall back to looking the zone up by ID rather than
+     * throw.
+     */
+    @Test
+    public void testGetDefaultWithUnfreezableAdapterZoneFallsBackToId() {
+        TimeZone originalIcu = TimeZone.getDefault();
+        java.util.TimeZone originalJdk = java.util.TimeZone.getDefault();
+        try {
+            java.util.TimeZone.setDefault(
+                    new TimeZoneAdapter(new UnfreezableZone(0, "America/New_York")));
+            TimeZone.setICUDefault(null);
+            TimeZone icu = TimeZone.getDefault();
+            assertEquals("ICU default ID", "America/New_York", icu.getID());
+            assertEquals(
+                    "ICU default raw offset (looked up by ID)",
+                    java.util.TimeZone.getTimeZone("America/New_York").getRawOffset(),
+                    icu.getRawOffset());
+        } finally {
+            java.util.TimeZone.setDefault(originalJdk);
+            TimeZone.setICUDefault(originalIcu);
+        }
+    }
+
+    /** A fixed-offset ICU zone that doesn't implement freeze(). */
+    private static final class UnfreezableZone extends TimeZone {
+        private static final long serialVersionUID = 1L;
+        private int rawOffset;
+
+        UnfreezableZone(int rawOffset, String id) {
+            super(id);
+            this.rawOffset = rawOffset;
+        }
+
+        @Override
+        public int getOffset(
+                int era, int year, int month, int day, int dayOfWeek, int milliseconds) {
+            return rawOffset;
+        }
+
+        @Override
+        public void setRawOffset(int offsetMillis) {
+            rawOffset = offsetMillis;
+        }
+
+        @Override
+        public int getRawOffset() {
+            return rawOffset;
+        }
+
+        @Override
+        public boolean useDaylightTime() {
+            return false;
+        }
+
+        @Override
+        public boolean inDaylightTime(java.util.Date date) {
+            return false;
+        }
+    }
+
     /** ZoneMeta SoftReference caches under contention. */
     @Test
     public void testZoneMetaConcurrent() throws Exception {
